@@ -1,15 +1,14 @@
 import * as acorn from "acorn";
-import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement } from "acorn";
+import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement } from "acorn";
 import { writeFile, cp, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
 const code = `
-function main (a, b) {
-    const bool = a > b;
-    if (bool) {
-        __run("say yes")
-    } else {
-        __run("say no")
+function main () {
+    let i = 0;
+    while (i < 5) {
+        __run("say " + i)
+        i += 1
     }
 }
 `
@@ -27,6 +26,25 @@ class MCFunction {
     }
 }
 
+type ExpressionNullOutput = {
+    type: "null"
+}
+type ExpressionLiteralOutput = {
+    type: "literal",
+    parsed: string,
+    raw: string | number | bigint | boolean | RegExp | null | undefined
+}
+type ExpressionVariableOutput = {
+    type: "variable",
+    value: string
+}
+type ExpressionOutput = ExpressionNullOutput | ExpressionLiteralOutput | ExpressionVariableOutput;
+
+const generateIfLines = (func: MCFunction, test: ExpressionVariableOutput, functionName: string) => {
+    func.output.push(`execute if data storage ${namespace}:${test.value} {value:true} run function ${namespace}:${functionName}`)
+    func.output.push(`execute if data storage ${namespace}:${test.value} {type:"number"} unless data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionName}`)
+    func.output.push(`execute if data storage ${namespace}:${test.value} {type:"string"} unless data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionName}`)
+}
 const handleNode = (node: Node, func: MCFunction): string => {
     if (node.type === "FunctionDeclaration") {
         const subfunc = new MCFunction()
@@ -73,9 +91,7 @@ const handleNode = (node: Node, func: MCFunction): string => {
             }
         } else if (test.type === "variable") {
             const functionName = "block" + Math.random()
-            func.output.push(`execute if data storage ${namespace}:${test.value} {value:true} run function ${namespace}:${functionName}`)
-            func.output.push(`execute if data storage ${namespace}:${test.value} {type:"number"} unless data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionName}`)
-            func.output.push(`execute if data storage ${namespace}:${test.value} {type:"string"} unless data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionName}`)
+            generateIfLines(func, test, functionName)
             const subfunc = new MCFunction()
             handleNode(ifStatement.consequent, subfunc)
             writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
@@ -92,22 +108,25 @@ const handleNode = (node: Node, func: MCFunction): string => {
             if (ifStatement.alternate) handleNode(ifStatement.alternate, func)
         }
     }
+    if (node.type === "WhileStatement") {
+        const whileStatement = node as WhileStatement;
+        const test = handleExpression(whileStatement.test, func)
+        if (test.type === "literal") {
+            return "";
+        } else if (test.type === "variable") {
+            const functionName = "block" + Math.random()
+            generateIfLines(func, test, functionName)
+            const subfunc = new MCFunction()
+            handleNode(whileStatement.body, subfunc)
+            const subtest = handleExpression(whileStatement.test, subfunc)
+            if (subtest.type !== "variable") return "";
+            generateIfLines(subfunc, subtest, functionName)
+            writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
+        }
+    }
     console.log(node)
     return "";
 }
-type ExpressionNullOutput = {
-    type: "null"
-}
-type ExpressionLiteralOutput = {
-    type: "literal",
-    parsed: string,
-    raw: string | number | bigint | boolean | RegExp | null | undefined
-}
-type ExpressionVariableOutput = {
-    type: "variable",
-    value: string
-}
-type ExpressionOutput = ExpressionNullOutput | ExpressionLiteralOutput | ExpressionVariableOutput;
 
 const parseLiteral = (literal: string | number | bigint | boolean | RegExp | null | undefined) => {
     if (typeof literal === "string") return "\"" + literal + "\"";
