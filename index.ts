@@ -1,14 +1,16 @@
 import * as acorn from "acorn";
-import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression } from "acorn";
-import { writeFile, cp } from "node:fs/promises";
+import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement } from "acorn";
+import { writeFile, cp, readdir, unlink } from "node:fs/promises";
+import path from "node:path";
 
 const code = `
-function main (weather) {
-    const map = {
-        "r": "rain",
-        "c": "clear"
+function main (a, b) {
+    const bool = a > b;
+    if (bool) {
+        __run("say yes")
+    } else {
+        __run("say no")
     }
-    __run("weather " + map[weather])
 }
 `
 
@@ -53,13 +55,44 @@ const handleNode = (node: Node, func: MCFunction): string => {
             const value = handleExpression(declaration.init, func);
             if (value.type === "literal") {
                 func.output.push(`data modify storage ${namespace}:${variableName} value set value ${value.parsed}`)
-                func.output.push(`data modify storage ${namespace}:${variableName} type set value "${typeof value.parsed}"`)
+                func.output.push(`data modify storage ${namespace}:${variableName} type set value "${typeof value.raw}"`)
             } else if (value.type === "variable") {
                 func.output.push(`data modify storage ${namespace}:${variableName} value set from storage ${namespace}:${value.value} value`)
                 func.output.push(`data modify storage ${namespace}:${variableName} type set from storage ${namespace}:${value.value} type`)
             }
         }
     }
+    if (node.type === "IfStatement") {
+        const ifStatement = node as IfStatement
+        const test = handleExpression(ifStatement.test, func)
+        if (test.type === "literal") {
+            if (test.raw) {
+                handleNode(ifStatement.consequent, func)
+            } else if (ifStatement.alternate) {
+                handleNode(ifStatement.alternate, func)
+            }
+        } else if (test.type === "variable") {
+            const functionName = "block" + Math.random()
+            func.output.push(`execute if data storage ${namespace}:${test.value} {value:true} run function ${namespace}:${functionName}`)
+            func.output.push(`execute if data storage ${namespace}:${test.value} {type:"number"} unless data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionName}`)
+            func.output.push(`execute if data storage ${namespace}:${test.value} {type:"string"} unless data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionName}`)
+            const subfunc = new MCFunction()
+            handleNode(ifStatement.consequent, subfunc)
+            writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
+            if (ifStatement.alternate) {
+                const functionAlternate = "block" + Math.random()
+                func.output.push(`execute if data storage ${namespace}:${test.value} {value:false} run function ${namespace}:${functionAlternate}`)
+                func.output.push(`execute if data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionAlternate}`)
+                func.output.push(`execute if data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionAlternate}`)
+                const alternatefunc = new MCFunction()
+                handleNode(ifStatement.alternate, alternatefunc)
+                writeFile("./output/" + functionAlternate + ".mcfunction", alternatefunc.output.join("\n"))
+            }
+        } else if (test.type === "null") {
+            if (ifStatement.alternate) handleNode(ifStatement.alternate, func)
+        }
+    }
+    console.log(node)
     return "";
 }
 type ExpressionNullOutput = {
@@ -129,7 +162,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         if (right.type === "literal") {
             if (assignmentExpression.operator === "=") {
                 func.output.push(`data modify storage ${namespace}:${variableName} value set value ${right.parsed}`)
-                func.output.push(`data modify storage ${namespace}:${variableName} type set value ${typeof right}`)
+                func.output.push(`data modify storage ${namespace}:${variableName} type set value ${typeof right.raw}`)
             }
             if (assignmentExpression.operator === "+=") {
                 func.output.push(`function ${namespace}:add${typeof right.raw}literal {namespace:"${namespace}",storage:"${namespace}:${variableName}",right:${right.parsed},operation:"add"}`)
@@ -181,6 +214,13 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                     type: "literal",
                     raw: left.raw + right.raw,
                     parsed: left.raw + right.raw + ""
+                }
+            }
+            if (expression.operator === "===") {
+                return {
+                    type: "literal",
+                    raw: left.raw === right.raw,
+                    parsed: (left.raw === right.raw) + ""
                 }
             }
             if (typeof left.raw !== "number" || typeof right.raw !== "number") return {"type": "null"}
@@ -245,6 +285,28 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                 func.output.push(`function ${namespace}:mathoperation {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",operation:"/="}`)
             } else if (expression.operator === "%") {
                 func.output.push(`function ${namespace}:mathoperation {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",operation:"%="}`)
+            } else if (expression.operator === "===" || expression.operator === "!==" || expression.operator === "<" || expression.operator === "<=" || expression.operator === ">" || expression.operator === ">=") {
+                const tempVariable = "temp-" + Math.random();
+                const resultVariable = "temp-" + Math.random();
+                func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} result set value "${namespace}:${resultVariable}"`)
+                if (expression.operator === "===" || expression.operator === "!==") {
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} left set value "${namespace}:${leftVariable}"`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} type set from storage ${namespace}:${rightVariable} type`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} value set from storage ${namespace}:${rightVariable} value`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} ifequal set value "${expression.operator === "==="}"`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} ifunequal set value "${expression.operator === "!=="}"`)
+                    func.output.push(`function ${namespace}:equals with storage ${namespace}:${tempVariable}`)
+                } else {
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} left set from storage ${namespace}:${leftVariable} value`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} right set from storage ${namespace}:${rightVariable} value`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} operator set value "${expression.operator}"`)
+                    func.output.push(`function ${namespace}:numbercompare with storage ${namespace}:${tempVariable}`)
+                }
+                return {
+                    type: "variable",
+                    value: resultVariable as string
+                }
             }
             return {
                 type: "variable",
@@ -342,7 +404,16 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         type: "null"
     };
 }
+
+const files = await readdir("./output");
+        
+for (const file of files) {
+    const filePath = path.join("./output", file);
+    await unlink(filePath);
+}
+
 for (const node of acorn.parse(code, {ecmaVersion: 2020}).body) {
     handleNode(node, new MCFunction());
 }
+
 await cp('libs/.', 'output/.', { recursive: true });
