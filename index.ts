@@ -1,14 +1,12 @@
 import * as acorn from "acorn";
-import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement } from "acorn";
+import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement, ForStatement } from "acorn";
 import { writeFile, cp, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
 const code = `
 function main () {
-    let i = 0;
-    while (i < 5) {
+    for (let i = 0; i < 5; i++) {
         __run("say " + i)
-        i += 1
     }
 }
 `
@@ -124,7 +122,27 @@ const handleNode = (node: Node, func: MCFunction): string => {
             writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
         }
     }
+    if (node.type === "ForStatement") {
+        const forStatement = node as ForStatement;
+        if (!forStatement.test) return "";
+        const test = handleExpression(forStatement.test, func)
+        if (test.type === "literal") {
+            return "";
+        } else if (test.type === "variable") {
+            if (forStatement.init) handleNode(forStatement.init, func);
+            const functionName = "block" + Math.random()
+            generateIfLines(func, test, functionName)
+            const subfunc = new MCFunction()
+            handleNode(forStatement.body, subfunc)
+            if (forStatement.update) handleExpression(forStatement.update, subfunc)
+            const subtest = handleExpression(forStatement.test, subfunc)
+            if (subtest.type !== "variable") return "";
+            generateIfLines(subfunc, subtest, functionName)
+            writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
+        }
+    }
     console.log(node)
+    handleExpression(node as Expression, func);
     return "";
 }
 
@@ -416,6 +434,36 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                     type: "variable",
                     value: tempVariable
                 }
+            }
+        }
+    }
+    if (expression.type === "UpdateExpression") {
+        const argument = handleExpression(expression.argument, func)
+        if (argument.type === "literal") {
+            if (typeof argument.raw !== "number") return {type: "null"};
+            return {
+                type: "literal",
+                raw: expression.prefix ? argument.raw + 1 : argument.raw,
+                parsed: (expression.prefix ? argument.raw + 1 : argument.raw) + ""
+            }
+        } else if (argument.type === "variable") {
+            const tempVariable = "temp-" + Math.random();
+            if (!expression.prefix) {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value set from storage ${namespace}:${argument.value} value`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set from storage ${namespace}:${argument.value} type`)
+            }
+            if (expression.operator === "++") {
+                func.output.push(`function ${namespace}:addnumberliteral {namespace:"${namespace}",storage:"${namespace}:${argument.value}",right:1,operation:"add"}`)
+            } else if (expression.operator === "--") {
+                func.output.push(`function ${namespace}:addnumberliteral {namespace:"${namespace}",storage:"${namespace}:${argument.value}",right:1,operation:"remove"}`)
+            }
+            if (!expression.prefix) return {
+                type: "variable",
+                value: tempVariable
+            }
+            return {
+                type: "variable",
+                value: argument.value
             }
         }
     }
