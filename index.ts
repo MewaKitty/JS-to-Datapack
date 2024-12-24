@@ -1,16 +1,32 @@
 import * as acorn from "acorn";
-import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement, ForStatement } from "acorn";
+import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement, ForStatement, SwitchStatement } from "acorn";
 import { writeFile, cp, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
 const code = `
 function main () {
-    const obj = {
-        "foo": () => {
-            __run("say a")
-        }
+    while (0) {
+        __run("say test")
     }
-    obj.foo()
+    let currentcount = 0;
+    while (1) {
+        __run("say " + currentcount)
+        currentcount++;
+        if (currentcount > 5) break;
+    }
+    switch (currentcount) {
+        case 4:
+            __run("say four")
+        case 5:
+            __run("say five")
+        case 6:
+            __run("say six")
+            break
+        case 6:
+            __run("say skipped")
+        default:
+            __run("say what")
+    }
 }
 `
 
@@ -42,9 +58,11 @@ type ExpressionVariableOutput = {
 type ExpressionOutput = ExpressionNullOutput | ExpressionLiteralOutput | ExpressionVariableOutput;
 
 const generateIfLines = (func: MCFunction, test: ExpressionVariableOutput, functionName: string) => {
-    func.output.push(`execute if data storage ${namespace}:${test.value} {value:true} run function ${namespace}:${functionName}`)
-    func.output.push(`execute if data storage ${namespace}:${test.value} {type:"number"} unless data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionName}`)
-    func.output.push(`execute if data storage ${namespace}:${test.value} {type:"string"} unless data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionName}`)
+    func.output.push(`data modify storage ${namespace}:temp-result result set value 0`)
+    func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:true} run function ${namespace}:${functionName}`)
+    func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"number"} unless data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionName}`)
+    func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"string"} unless data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionName}`)
+    func.output.push(`execute if data storage ${namespace}:temp-result {result:-2000000000} run return -2000000000`)
 }
 const handleNode = (node: Node, func: MCFunction): string => {
     if (node.type === "FunctionDeclaration") {
@@ -99,9 +117,11 @@ const handleNode = (node: Node, func: MCFunction): string => {
             writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
             if (ifStatement.alternate) {
                 const functionAlternate = "block" + Math.random()
-                func.output.push(`execute if data storage ${namespace}:${test.value} {value:false} run function ${namespace}:${functionAlternate}`)
-                func.output.push(`execute if data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionAlternate}`)
-                func.output.push(`execute if data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionAlternate}`)
+                func.output.push(`data modify storage ${namespace}:temp-result result set value 0`)
+                func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:false} run function ${namespace}:${functionAlternate}`)
+                func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionAlternate}`)
+                func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionAlternate}`)
+                func.output.push(`execute if data storage ${namespace}:temp-result {result:-2000000000} run return -2000000000`)
                 const alternatefunc = new MCFunction()
                 handleNode(ifStatement.alternate, alternatefunc)
                 writeFile("./output/" + functionAlternate + ".mcfunction", alternatefunc.output.join("\n"))
@@ -113,18 +133,23 @@ const handleNode = (node: Node, func: MCFunction): string => {
     if (node.type === "WhileStatement") {
         const whileStatement = node as WhileStatement;
         const test = handleExpression(whileStatement.test, func)
-        if (test.type === "literal") {
-            return "";
-        } else if (test.type === "variable") {
-            const functionName = "block" + Math.random()
+        if (test.type === "literal" && !test.raw) return "";
+        const functionName = "block" + Math.random()
+        if (test.type === "variable") {
             generateIfLines(func, test, functionName)
-            const subfunc = new MCFunction()
-            handleNode(whileStatement.body, subfunc)
+        } else {
+            func.output.push(`function ${namespace}:${functionName}`)
+        }
+        const subfunc = new MCFunction()
+        handleNode(whileStatement.body, subfunc)
+        if (test.type === "variable") {
             const subtest = handleExpression(whileStatement.test, subfunc)
             if (subtest.type !== "variable") return "";
             generateIfLines(subfunc, subtest, functionName)
-            writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
+        } else {     
+            subfunc.output.push(`function ${namespace}:${functionName}`)
         }
+        writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
     }
     if (node.type === "ForStatement") {
         const forStatement = node as ForStatement;
@@ -144,6 +169,55 @@ const handleNode = (node: Node, func: MCFunction): string => {
             generateIfLines(subfunc, subtest, functionName)
             writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
         }
+    }
+    if (node.type === "SwitchStatement") {
+        const switchStatement = node as SwitchStatement;
+        const discriminant = handleExpression(switchStatement.discriminant, func);
+        let discriminantName = "temp-" + Math.random();
+        if (discriminant.type === "literal") {
+            func.output.push(`data modify storage ${namespace}:${discriminantName} value set value ${discriminant.parsed}`)
+            func.output.push(`data modify storage ${namespace}:${discriminantName} type set value ${typeof discriminant.raw}`)
+        } else if (discriminant.type === "variable") {
+            discriminantName = discriminant.value;
+        }
+        const switchname = "block" + Math.random();
+        const switchfunc = new MCFunction()
+        for (const switchCase of switchStatement.cases) {
+            const functionName = "block" + Math.random()
+            if (switchCase.test) {
+                const test = handleExpression(switchCase.test, switchfunc)
+                const tempVariable = "temp-" + Math.random();
+                const resultVariable = "temp-" + Math.random();
+                switchfunc.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
+                switchfunc.output.push(`data modify storage ${namespace}:${tempVariable} result set value "${namespace}:${resultVariable}"`)
+                switchfunc.output.push(`data modify storage ${namespace}:${tempVariable} left set value "${namespace}:${discriminantName}"`)
+                if (test.type === "variable") {
+                    switchfunc.output.push(`data modify storage ${namespace}:${tempVariable} type set from storage ${namespace}:${test.value} type`)
+                    switchfunc.output.push(`data modify storage ${namespace}:${tempVariable} value set from storage ${namespace}:${test.value} value`)
+                } else if (test.type === "literal") {
+                    switchfunc.output.push(`data modify storage ${namespace}:${tempVariable} type set value "${typeof test.raw}"`)
+                    switchfunc.output.push(`data modify storage ${namespace}:${tempVariable} value set value ${test.parsed}`)
+                }
+                switchfunc.output.push(`data modify storage ${namespace}:${tempVariable} ifequal set value "true"`)
+                switchfunc.output.push(`data modify storage ${namespace}:${tempVariable} ifunequal set value "false"`)
+                switchfunc.output.push(`function ${namespace}:equals with storage ${namespace}:${tempVariable}`)
+                
+                switchfunc.output.push(`data modify storage ${namespace}:temp-result result set value 0`)
+                switchfunc.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${resultVariable} {value:true} run function ${namespace}:${functionName}`)
+                switchfunc.output.push(`execute if data storage ${namespace}:temp-result {result:-2000000000} run return 0`)
+                const subfunc = new MCFunction()
+                for (const node of switchCase.consequent) handleNode(node, subfunc)
+                writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
+            } else {
+                for (const node of switchCase.consequent) handleNode(node, switchfunc)
+            }
+        }
+        writeFile("./output/" + switchname + ".mcfunction", switchfunc.output.join("\n"))
+
+        func.output.push(`function ${namespace}:${switchname}`)
+    }
+    if (node.type === "BreakStatement") {
+        func.output.push("return -2000000000")
     }
     handleExpression(node as Expression, func);
     return "";
