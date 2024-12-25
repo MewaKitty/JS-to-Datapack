@@ -1,0 +1,1 @@
+$function $(namespace):$(function) with storage $(storage)

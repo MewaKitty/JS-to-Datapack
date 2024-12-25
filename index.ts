@@ -1,31 +1,13 @@
 import * as acorn from "acorn";
-import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement, ForStatement, SwitchStatement } from "acorn";
+import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement, ForStatement, SwitchStatement, ForOfStatement } from "acorn";
 import { writeFile, cp, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
 const code = `
 function main () {
-    while (0) {
-        __run("say test")
-    }
-    let currentcount = 0;
-    while (1) {
-        __run("say " + currentcount)
-        currentcount++;
-        if (currentcount > 5) break;
-    }
-    switch (currentcount) {
-        case 4:
-            __run("say four")
-        case 5:
-            __run("say five")
-        case 6:
-            __run("say six")
-            break
-        case 6:
-            __run("say skipped")
-        default:
-            __run("say what")
+    const animals = ["pig", "cow"]
+    for (let i = 0; i < 3; i++) {
+        for (const animal of animals) __run("summon " + animal)
     }
 }
 `
@@ -154,11 +136,11 @@ const handleNode = (node: Node, func: MCFunction): string => {
     if (node.type === "ForStatement") {
         const forStatement = node as ForStatement;
         if (!forStatement.test) return "";
+        if (forStatement.init) handleNode(forStatement.init, func);
         const test = handleExpression(forStatement.test, func)
         if (test.type === "literal") {
             return "";
         } else if (test.type === "variable") {
-            if (forStatement.init) handleNode(forStatement.init, func);
             const functionName = "block" + Math.random()
             generateIfLines(func, test, functionName)
             const subfunc = new MCFunction()
@@ -218,6 +200,26 @@ const handleNode = (node: Node, func: MCFunction): string => {
     }
     if (node.type === "BreakStatement") {
         func.output.push("return -2000000000")
+    }
+    if (node.type === "ForOfStatement") {
+        const forOf = node as ForOfStatement
+        if (forOf.left.type !== "VariableDeclaration") return "";
+        const variableName = ((forOf.left as unknown as VariableDeclaration).declarations[0].id as Identifier).name
+        const right = handleExpression(forOf.right, func)
+        if (right.type !== "variable") return "";
+        const tempVariable = "temp-" + Math.random();
+        const functionName = "block" + Math.random()
+        func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
+        func.output.push(`data modify storage ${namespace}:${tempVariable} storage set value "${namespace}:${right.value}"`)
+        func.output.push(`data modify storage ${namespace}:${tempVariable} index set value 0`)
+        func.output.push(`data modify storage ${namespace}:${tempVariable} function set value "${namespace}:${functionName}"`)
+        func.output.push(`function ${namespace}:looparray with storage ${namespace}:${tempVariable}`)
+        const subfunc = new MCFunction()
+        subfunc.output.push(`data modify storage ${namespace}:${variableName} value set from storage ${namespace}:temp data.value`)
+        subfunc.output.push(`data modify storage ${namespace}:${variableName} type set from storage ${namespace}:temp data.type`)
+        subfunc.output.push(`data modify storage ${namespace}:${variableName} function set from storage ${namespace}:temp data.function`)
+        handleNode(forOf.body, subfunc)
+        writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
     }
     handleExpression(node as Expression, func);
     return "";
@@ -527,9 +529,10 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
 
             } else if (object.type === "variable") {
                 const tempVariable = "temp-" + Math.random();
-                func.output.push(`data modify storage ${namespace}:${tempVariable} value set from storage ${namespace}:${object.value} value.${propertyValue}.value`)
-                func.output.push(`data modify storage ${namespace}:${tempVariable} type set from storage ${namespace}:${object.value} value.${propertyValue}.type`)
-                func.output.push(`data modify storage ${namespace}:${tempVariable} function set from storage ${namespace}:${object.value} value.${propertyValue}.function`)
+                const index = property.type === "literal" && typeof property.raw === "number" ? `value[${propertyValue}]` : `value.${propertyValue}`
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value set from storage ${namespace}:${object.value} ${index}.value`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set from storage ${namespace}:${object.value} ${index}.type`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} function set from storage ${namespace}:${object.value} ${index}.function`)
                 return {
                     type: "variable",
                     value: tempVariable
@@ -591,6 +594,25 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             value: tempVariable
         }
     }
+    if (expression.type === "ArrayExpression") {
+        const tempVariable = "temp-" + Math.random();
+        func.output.push(`data modify storage ${namespace}:${tempVariable} value set value []`)
+        func.output.push(`data modify storage ${namespace}:${tempVariable} type set value array`)
+        for (const node of expression.elements) {
+            if (!node || node.type === "SpreadElement") return {"type": "null"};
+            const element = handleExpression(node, func)
+            if (element.type === "literal") {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value append value {type: "${typeof element.raw}", value: ${element.parsed}}`)
+            } else if (element.type === "variable") {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value append from storage ${namespace}:${element.value}`)
+            }
+        }
+        return {
+            type: "variable",
+            value: tempVariable
+        }
+    }
+    console.log(expression)
     return {
         type: "null"
     };
