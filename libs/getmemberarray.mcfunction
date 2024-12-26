@@ -1,0 +1,3 @@
+$execute if data storage $(object) {type:"array"} run data modify storage $(result) value set from storage $(object) array[$(property)].value
+$execute if data storage $(object) {type:"array"} run data modify storage $(result) type set from storage $(object) array[$(property)].type
+$execute if data storage $(object) {type:"array"} run data modify storage $(result) function set from storage $(object) array[$(property)].function
