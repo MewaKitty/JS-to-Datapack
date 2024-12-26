@@ -1,6 +1,6 @@
-$execute store success storage $(namespace):temp-array success int 1 run data get storage $(storage) value[$(index)]
+$execute store success storage $(namespace):temp-array success int 1 run data get storage $(storage) array[$(index)]
 $execute if data storage $(namespace):temp-array {success:0} run return 0
-$data modify storage $(namespace):temp data set from storage $(storage) value[$(index)]
+$data modify storage $(namespace):temp data set from storage $(storage) array[$(index)]
 $function $(function) with storage $(namespace):temp
 scoreboard objectives add temp dummy
 $scoreboard players set value temp $(index)

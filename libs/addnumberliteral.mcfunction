@@ -1,5 +1,5 @@
 scoreboard objectives add temp dummy
-$execute store result score value temp run data get storage $(storage) value
+$execute store result score value temp run data get storage $(storage) $(prefix)value
 $scoreboard players $(operation) value temp $(right)
-$execute store result storage $(storage) value int 1 run scoreboard players get value temp
+$execute store result storage $(storage) $(prefix)value int 1 run scoreboard players get value temp
 scoreboard objectives remove temp
