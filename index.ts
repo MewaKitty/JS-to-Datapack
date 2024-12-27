@@ -1,41 +1,15 @@
 import * as acorn from "acorn";
-import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement, ForStatement, SwitchStatement, ForOfStatement, ClassDeclaration, MethodDefinition, MemberExpression } from "acorn";
+import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement, ForStatement, SwitchStatement, ForOfStatement, ClassDeclaration, MethodDefinition, MemberExpression, ReturnStatement } from "acorn";
 import { writeFile, cp, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { StringDecoder } from "node:string_decoder";
 
 const code = `
 function main () {
-    class basetest {
-        constructor () {
-            __run("say the base class is now in session")
-        }
-        base () {
-            __run("say base what")
-        }
-        look () {
-            __run("say look at that")
-        }
+    const testfunc = () => {
+        return "example"
     }
-    class test extends basetest {
-        constructor () {
-            super();
-            this.a = "testing";
-            __run("say constructing")
-        }
-        look () {
-            __run("say look look")
-        }
-        run () {
-            __run("say the magic word is " + this.a)
-            const key = "look"
-            super[key]()
-        }
-    }
-    const thetest = new test()
-    __run("say " + thetest.a)
-    thetest.run()
-    thetest.base()
+    __run("say " + testfunc())
 }
 `
 
@@ -47,12 +21,14 @@ const functions: Record<string, {
 
 type MCFunctionMetadata = {
     superClass?: string | null
+    type?: string | null
 }
 
 class MCFunction {
     output: string[]
     that?: string
     superClass?: string | null
+    type?: string | null
     constructor (metadata?: MCFunctionMetadata) {
         this.output = [];
         if (metadata) this.superClass = metadata.superClass
@@ -326,6 +302,20 @@ const handleNode = (node: Node, func: MCFunction): string => {
             func.output.push(`data modify storage ${namespace}:${prototypeVariable} string.${methodName}.function set from storage ${namespace}:${methodVariable} function`)
         }
     }
+    if (node.type === "ReturnStatement") {
+        if ((node as ReturnStatement).argument) {
+            const argument = handleExpression((node as ReturnStatement).argument as Expression, func);
+            if (argument.type === "literal") {
+                func.output.push(`$data modify storage $(__return) value set value ${argument.parsed}`)
+                func.output.push(`$data modify storage $(__return) type set value "${typeof argument.raw}"`)
+            } else if (argument.type === "variable") {
+                func.output.push(`$data modify storage $(__return) value set from storage ${namespace}:${argument.value} value`)
+                func.output.push(`$data modify storage $(__return) type set from storage ${namespace}:${argument.value} type`)
+                func.output.push(`$data modify storage $(__return) function set from storage ${namespace}:${argument.value} function`)
+            }
+        }
+        func.output.push(`return 0`)
+    }
     handleExpression(node as Expression, func);
     return "";
 }
@@ -386,6 +376,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                     if (callee.type !== "variable") return {"type": "null"}
                 }
                 const tempVariable = "temp-" + Math.random();
+                const resultVariable = "temp-" + Math.random();
                 func.output.push(`data modify storage ${namespace}:${tempVariable} function set from storage ${namespace}:${callee.value} function`)
                 
                 for (const [index, argument] of (expression as CallExpression).arguments.entries()) {
@@ -404,7 +395,12 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                     func.output.push(`data modify storage ${namespace}:params __this set value "${namespace}:${callee.object?.value}"`)
                     func.output.push(`data modify storage ${namespace}:params __this_obj set from storage ${namespace}:${callee.object?.value} value`)
                 }
+                func.output.push(`data modify storage ${namespace}:params __return set value "${namespace}:${resultVariable}"`)
                 func.output.push(`function ${namespace}:call with storage ${namespace}:${tempVariable}`)
+                return {
+                    type: "variable",
+                    value: resultVariable
+                }
             }
         }
     }
@@ -831,7 +827,9 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
     if (expression.type === "ArrowFunctionExpression") {
         return {
             type: "variable",
-            value: generateFunction(expression.params as Identifier[], expression.expression, expression.body, func, null, false, {})[0]
+            value: generateFunction(expression.params as Identifier[], expression.expression, expression.body, func, null, false, {
+                type: "arrow"
+            })[0]
         }
     }
     if (expression.type === "ArrayExpression") {
