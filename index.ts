@@ -2,14 +2,22 @@ import * as acorn from "acorn";
 import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement, ForStatement, SwitchStatement, ForOfStatement, ClassDeclaration, MethodDefinition, MemberExpression, ReturnStatement } from "acorn";
 import { writeFile, cp, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
-import type { StringDecoder } from "node:string_decoder";
 
 const code = `
 function main () {
-    const testfunc = () => {
-        return "example"
+    if (1) {
+        class Test {
+            constructor () {
+                __run("say test ran")
+                this.ran = true;
+            }
+            hasRan () {
+                __run("say it is " + this.ran)
+            }
+        }
+        const theTest = new Test();
+        theTest.hasRan();
     }
-    __run("say " + testfunc())
 }
 `
 
@@ -22,6 +30,7 @@ const functions: Record<string, {
 type MCFunctionMetadata = {
     superClass?: string | null
     type?: string | null
+    scopeList: string[]
 }
 
 class MCFunction {
@@ -29,9 +38,15 @@ class MCFunction {
     that?: string
     superClass?: string | null
     type?: string | null
-    constructor (metadata?: MCFunctionMetadata) {
+    blockScope: string
+    scopeList: string[]
+    constructor (metadata: MCFunctionMetadata) {
         this.output = [];
         if (metadata) this.superClass = metadata.superClass
+        if (metadata) this.type = metadata.type
+        this.blockScope = "scope-" + Math.random();
+        this.scopeList = [...metadata.scopeList, this.blockScope]
+        this.output.push(`data modify storage ${namespace}:${this.blockScope} scopes set value [${this.scopeList.map(scope => `"${scope}"`).join(", ")}]`)
     }
 }
 
@@ -117,12 +132,12 @@ const handleNode = (node: Node, func: MCFunction): string => {
             if (!declaration.init) continue;
             const value = handleExpression(declaration.init, func);
             if (value.type === "literal") {
-                func.output.push(`data modify storage ${namespace}:${variableName} value set value ${value.parsed}`)
-                func.output.push(`data modify storage ${namespace}:${variableName} type set value "${typeof value.raw}"`)
+                func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${variableName}.value set value ${value.parsed}`)
+                func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${variableName}.type set value "${typeof value.raw}"`)
             } else if (value.type === "variable") {
-                func.output.push(`data modify storage ${namespace}:${variableName} value set from storage ${namespace}:${value.value} value`)
-                func.output.push(`data modify storage ${namespace}:${variableName} type set from storage ${namespace}:${value.value} type`)
-                func.output.push(`data modify storage ${namespace}:${variableName} function set from storage ${namespace}:${value.value} function`)
+                func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${variableName}.value set from storage ${namespace}:${value.value} value`)
+                func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${variableName}.type set from storage ${namespace}:${value.value} type`)
+                func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${variableName}.function set from storage ${namespace}:${value.value} function`)
             }
         }
     }
@@ -130,11 +145,14 @@ const handleNode = (node: Node, func: MCFunction): string => {
         const ifStatement = node as IfStatement
         const test = handleExpression(ifStatement.test, func)
         if (test.type === "literal") {
+            const functionName = "block" + Math.random()
+            const subfunc = new MCFunction(func)
             if (test.raw) {
-                handleNode(ifStatement.consequent, func)
+                handleNode(ifStatement.consequent, subfunc)
             } else if (ifStatement.alternate) {
-                handleNode(ifStatement.alternate, func)
+                handleNode(ifStatement.alternate, subfunc)
             }
+            writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
         } else if (test.type === "variable") {
             const functionName = "block" + Math.random()
             generateIfLines(func, test, functionName)
@@ -278,12 +296,15 @@ const handleNode = (node: Node, func: MCFunction): string => {
             console.log(superClass)
             if (superClass.type !== "variable") return "";
         }
-        const [constructorVariable, objVariable] = generateFunction(constructorMethod.value.params as Identifier[], constructorMethod.value.expression, constructorMethod.value.body, func, instanceVariable, true, {superClass: superClass?.value});
+        const [constructorVariable, objVariable] = generateFunction(constructorMethod.value.params as Identifier[], constructorMethod.value.expression, constructorMethod.value.body, func, instanceVariable, true, {
+            superClass: superClass?.value,
+            scopeList: func.scopeList
+        });
 
         const className = (node as ClassDeclaration).id.name;
-        func.output.push(`data modify storage ${namespace}:${className} value set from storage ${namespace}:${constructorVariable} value`)
-        func.output.push(`data modify storage ${namespace}:${className} type set from storage ${namespace}:${constructorVariable} type`)
-        func.output.push(`data modify storage ${namespace}:${className} function set from storage ${namespace}:${constructorVariable} function`)
+        func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${className}.value set from storage ${namespace}:${constructorVariable} value`)
+        func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${className}.type set from storage ${namespace}:${constructorVariable} type`)
+        func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${className}.function set from storage ${namespace}:${constructorVariable} function`)
         
         const prototypeVariable = "obj-" + Math.random();
         func.output.push(`data modify storage ${namespace}:${objVariable} string.prototype.value set value "${namespace}:${prototypeVariable}"`)
@@ -296,7 +317,10 @@ const handleNode = (node: Node, func: MCFunction): string => {
         const methods = (node as ClassDeclaration).body.body.filter(node => "kind" in node ? node.kind === "method" : false) as MethodDefinition[];
         for (const method of methods) {
             const methodName = (method.key as Identifier).name;
-            const methodVariable = generateFunction(method.value.params as Identifier[], method.value.expression, method.value.body, func, instanceVariable, false, {superClass: superClass?.value})[0];
+            const methodVariable = generateFunction(method.value.params as Identifier[], method.value.expression, method.value.body, func, instanceVariable, false, {
+                superClass: superClass?.value,
+                scopeList: func.scopeList
+            })[0];
             func.output.push(`data modify storage ${namespace}:${prototypeVariable} string.${methodName}.value set from storage ${namespace}:${methodVariable} value`)
             func.output.push(`data modify storage ${namespace}:${prototypeVariable} string.${methodName}.type set from storage ${namespace}:${methodVariable} type`)
             func.output.push(`data modify storage ${namespace}:${prototypeVariable} string.${methodName}.function set from storage ${namespace}:${methodVariable} function`)
@@ -332,10 +356,21 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         raw: expression.value,
         parsed: parseLiteral(expression.value)
     }
-    if (expression.type === "Identifier") return {
-        type: "variable",
-        value: expression.name
-    };
+    if (expression.type === "Identifier") {
+        const tempVariable = "temp-" + Math.random();
+        const resultVariable = "temp-" + Math.random();
+        func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
+        func.output.push(`data modify storage ${namespace}:${tempVariable} storage set value "${namespace}:${func.blockScope}"`)
+        func.output.push(`data modify storage ${namespace}:${tempVariable} index set value "-2"`)
+        func.output.push(`data modify storage ${namespace}:${tempVariable} blockScope set value "${func.blockScope}"`)
+        func.output.push(`data modify storage ${namespace}:${tempVariable} name set value "${expression.name}"`)
+        func.output.push(`data modify storage ${namespace}:${tempVariable} result set value "${namespace}:${resultVariable}"`)
+        func.output.push(`function ${namespace}:getvariable with storage ${namespace}:${tempVariable}`)
+        return {
+            type: "variable",
+            value: resultVariable
+        }
+    }
     if (expression.type === "CallExpression") {
         if (((expression as CallExpression)?.callee as Identifier)?.name === "__run") {
             if (expression.arguments[0].type === "Literal" && typeof expression.arguments[0].value === "string") {
@@ -451,7 +486,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                 type: "null"
             };
             objectName = object.value;
-            const property = handleExpression(memberExpression.property as Expression, func);
+            const property: ExpressionOutput = memberExpression.property.type === "Identifier" ? {type:"variable",value:memberExpression.property.name} : handleExpression(memberExpression.property as Expression, func);
             if (property.type === "variable" && memberExpression.computed) {
             } else if (property.type === "literal" || !memberExpression.computed) {
                 const propertyValue = property.type === "literal" ? property.raw : (property.type === "variable" ? property.value : "");
@@ -463,6 +498,64 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         }
         const right = handleExpression(assignmentExpression.right, func)
         const tempVariable = "temp-" + Math.random();
+        let result = null;
+        if (assignmentExpression.operator === "=") {
+            result = right;
+        } else {
+            const input = handleExpression(assignmentExpression.left as Identifier, func)
+            if (input.type !== "variable") return {"type": "null"}
+            const leftVariable = input.value;
+            let rightVariable = null;
+            if (right.type === "literal") {
+                const tempVariable = "temp-" + Math.random();
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value set value "${right.raw}"`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set value ${typeof right.raw}`)
+                rightVariable = tempVariable
+            } else if (right.type === "variable") {
+                rightVariable = right.value;
+            }
+            if (assignmentExpression.operator === "+=") {
+                func.output.push(`function ${namespace}:add {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",prefix:""}`)
+            } else if (assignmentExpression.operator === "-=") {
+                func.output.push(`function ${namespace}:subtract {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",prefix:""}`)
+            } else if (assignmentExpression.operator === "*=") {
+                func.output.push(`function ${namespace}:mathoperation {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",operation:"*="}`)
+            } else if (assignmentExpression.operator === "/=") {
+                func.output.push(`function ${namespace}:mathoperation {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",operation:"/="}`)
+            } else if (assignmentExpression.operator === "%=") {
+                func.output.push(`function ${namespace}:mathoperation {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",operation:"%="}`)
+            } else {
+                return {"type": "null"}
+            }
+            result = input;
+        }
+        if (assignmentExpression.left.type === "MemberExpression") {
+            func.output.push(`data modify storage ${namespace}:${tempVariable} storage set from storage ${namespace}:${objectName} value`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} property set value "${propertyName}"`)
+            if (result.type === "literal") {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value set value ${result.parsed}`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set value "${typeof result.raw}"`)
+            } else if (result.type === "variable") {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value set from storage ${namespace}:${result.value} value`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set from storage ${namespace}:${result.value} type`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} function set from storage ${namespace}:${result.value} function`)
+            }
+            func.output.push(`function ${namespace}:setmember with storage ${namespace}:${tempVariable}`)
+        } else {
+            func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} storage set value "${namespace}:${func.blockScope}"`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} index set value "-2"`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} blockScope set value "${func.blockScope}"`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} name set value "${variableName}"`)
+            if (result.type === "literal") {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set value "${result.type}"`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value set value ${result.parsed}`)
+                func.output.push(`function ${namespace}:setvariableliteral with storage ${namespace}:${tempVariable}`)
+            } else if (result.type === "variable") {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} result set value "${namespace}:${result.value}"`)
+                func.output.push(`function ${namespace}:setvariable with storage ${namespace}:${tempVariable}`)
+            }
+        }/*
         if (right.type === "literal") {
             if (assignmentExpression.operator === "=") {
                 if (assignmentExpression.left.type === "MemberExpression") {
@@ -519,9 +612,19 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                     func.output.push(`data modify storage ${namespace}:${tempVariable} function set from storage ${namespace}:${right.value} function`)
                     func.output.push(`function ${namespace}:setmemberliteral with storage ${namespace}:${tempVariable}`)
                 } else {
-                    func.output.push(`data modify storage ${namespace}:${variableName} ${prefix}value set from storage ${namespace}:${right.value} value`)
-                    func.output.push(`data modify storage ${namespace}:${variableName} ${prefix}type set from storage ${namespace}:${right.value} type`)
-                    func.output.push(`data modify storage ${namespace}:${variableName} ${prefix}function set from storage ${namespace}:${right.value} function`)
+                    const tempVariable = "temp-" + Math.random();
+                    const resultVariable = "temp-" + Math.random();
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} storage set value "${namespace}:${func.blockScope}"`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} index set value "-2"`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} blockScope set value "${func.blockScope}"`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} name set value "${variableName}"`)
+                    func.output.push(`data modify storage ${namespace}:${tempVariable} result set value "${namespace}:${right.value}"`)
+                    func.output.push(`function ${namespace}:setvariable with storage ${namespace}:${tempVariable}`)
+                    return {
+                        type: "variable",
+                        value: resultVariable
+                    }
                 }
             }
             if (assignmentExpression.operator === "+=") {
@@ -554,7 +657,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             } else if (assignmentExpression.operator === "%=") {
                 func.output.push(`function ${namespace}:mathoperation {namespace:"${namespace}",left:"${namespace}:${variableName}",right:"${namespace}:${right.value}",operation:"%="}`)
             }
-        }
+        }*/
     }
     if (expression.type === "BinaryExpression") {
         const left = handleExpression(expression.left as Expression, func);
@@ -726,7 +829,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         }
     }
     if (expression.type === "MemberExpression") {
-        const property = handleExpression(expression.property as Expression, func)
+        const property: ExpressionOutput = expression.property.type === "Identifier" ? {type: "variable", value: expression.property.name} : handleExpression(expression.property as Expression, func)
         if (expression.object.type === "Super") {
             console.log("it's super member time!")
             console.log(func)
@@ -774,11 +877,6 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             } else if (object.type === "variable") {
                 const tempVariable = "temp-" + Math.random();
                 const resultVariable = "temp-" + Math.random();
-                /*
-                const index = property.type === "literal" && typeof property.raw === "number" ? `value[${propertyValue}]` : `value.${propertyValue}`
-                func.output.push(`data modify storage ${namespace}:${tempVariable} value set from storage ${namespace}:${object.value} ${index}.value`)
-                func.output.push(`data modify storage ${namespace}:${tempVariable} type set from storage ${namespace}:${object.value} ${index}.type`)
-                func.output.push(`data modify storage ${namespace}:${tempVariable} function set from storage ${namespace}:${object.value} ${index}.function`)*/
                 
                 func.output.push(`data modify storage ${namespace}:${tempVariable} property set value "${propertyValue}"`)
                 func.output.push(`data modify storage ${namespace}:${tempVariable} object set value "${namespace}:${object.value}"`)
@@ -828,7 +926,8 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         return {
             type: "variable",
             value: generateFunction(expression.params as Identifier[], expression.expression, expression.body, func, null, false, {
-                type: "arrow"
+                type: "arrow",
+                scopeList: func.scopeList
             })[0]
         }
     }
@@ -878,7 +977,9 @@ for (const file of files) {
 }
 
 for (const node of acorn.parse(code, {ecmaVersion: 2020}).body) {
-    handleNode(node, new MCFunction());
+    handleNode(node, new MCFunction({
+        scopeList: []
+    }));
 }
 
 await cp('libs/.', 'output/.', { recursive: true });
