@@ -23,12 +23,25 @@ function main () {
     const promise = new Promise(res => {
         resolver = res
     })
-    for (let i = 0; i < 3; i++) {
-        promise.then(data => {
-            console.log("promise done")
-            console.log("resolved with " + data)
-        })
+    const foo = async () => {
+        console.log("starting the await")
+        const result = await promise;
+        console.log("the magic word is: " + result)
+        console.log("ending the await")
+        return 7;
     }
+    console.log("foo is " + __resolveVariable(foo))
+    const magic = async () => {
+        console.log("magic time")
+        const innerPromise = foo();
+        console.log(__resolveObject(innerPromise))
+        console.log(await innerPromise)
+        console.log("magic done")
+    }
+    magic();
+    promise.then(() => {
+        console.log("then")
+    })
     resolver("test")
 }
 `
@@ -45,7 +58,8 @@ type MCFunctionMetadata = {
     scopeList: string[],
     that?: string,
     output?: string[],
-    skipScope?: boolean
+    skipScope?: boolean,
+    isAsync?: boolean
 }
 
 class MCFunction {
@@ -55,6 +69,9 @@ class MCFunction {
     type?: string | null
     blockScope: string
     scopeList: string[]
+    destination?: string
+    asyncReturn?: string
+    asyncReturnValue?: string
     constructor (metadata: MCFunctionMetadata) {
         if (metadata.output && !(metadata instanceof MCFunction)) {
             this.output = metadata.output;
@@ -73,6 +90,15 @@ class MCFunction {
             this.scopeList = metadata.scopeList
         }
         this.output.push(`data modify storage ${namespace}:${this.blockScope} scopes set value [${this.scopeList.map(scope => `"${scope}"`).join(", ")}]`)
+        if (metadata.isAsync) {
+            const asyncReturnValue = "temp-" + Math.random();
+            this.output.push(`data modify storage ${namespace}:${asyncReturnValue} type set value "undefined"`)
+            this.asyncReturnValue = asyncReturnValue;
+        }
+    }
+    write () {
+        if (!this.destination) throw new TypeError("destination property must exist in MCFunction instance")
+        writeFile(this.destination, this.output.join("\n"))
     }
 }
 
@@ -102,6 +128,7 @@ const generateIfLines = (func: MCFunction, test: ExpressionVariableOutput, funct
 const generateFunction = (params: Identifier[], isExpression: boolean, body: Node, func: MCFunction, that: null | string, isConstructor: boolean, metadata: MCFunctionMetadata) => {
     const functionName = "arrow" + Math.random()
     const subfunc = new MCFunction(metadata)
+    subfunc.destination = "./output/" + functionName + ".mcfunction"
     for (const [index, param] of params.entries()) {
         subfunc.output.push(`$data modify storage ${namespace}:${func.blockScope} variables.${param.name}.value set from storage $(${index}) value`)
         subfunc.output.push(`$data modify storage ${namespace}:${func.blockScope} variables.${param.name}.type set from storage $(${index}) type`)
@@ -111,6 +138,13 @@ const generateFunction = (params: Identifier[], isExpression: boolean, body: Nod
         subfunc.that = that;
         subfunc.output.push(`data modify storage ${namespace}:${that} type set value "object"`)
         subfunc.output.push(`$data modify storage ${namespace}:${that} value set from storage $(__this) value`)
+    }
+    if (metadata.isAsync) {
+        const returnObjVariable = "temp-" + Math.random();
+        subfunc.output.push(`$data modify storage $(__return) value set value "${namespace}:${returnObjVariable}"`)
+        subfunc.output.push(`$data modify storage $(__return) type set value "object"`)
+        subfunc.output.push(`data modify storage ${namespace}:${returnObjVariable} promise set value {listeners:[]}`)
+        subfunc.asyncReturn = returnObjVariable;
     }
     if (isExpression) {
         handleExpression(body as Expression, subfunc)
@@ -123,7 +157,15 @@ const generateFunction = (params: Identifier[], isExpression: boolean, body: Nod
         subfunc.output.push(`$data modify storage $(__this) value set from storage ${namespace}:${that} value`)
         if (isConstructor) subfunc.output.push(`$data modify storage $(__this_obj) prototype set value "${namespace}:${objVariable}"`)
     }
-    writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
+    if (metadata.isAsync) {
+        const promiseResolveVariable = "temp-" + Math.random();
+        subfunc.output.push(`data modify storage ${namespace}:${promiseResolveVariable} namespace set value "${namespace}"`)
+        subfunc.output.push(`data modify storage ${namespace}:${promiseResolveVariable} storage set value "${namespace}:${subfunc.asyncReturn}"`)
+        subfunc.output.push(`data modify storage ${namespace}:${promiseResolveVariable} index set value 0`)
+        subfunc.output.push(`data modify storage ${namespace}:${promiseResolveVariable} data set value "${namespace}:${subfunc.asyncReturnValue}"`)
+        subfunc.output.push(`function ${namespace}:resolvepromise with storage ${namespace}:${promiseResolveVariable}`)
+    }
+    subfunc.write();
     const tempVariable = "temp-" + Math.random();
     func.output.push(`data modify storage ${namespace}:${tempVariable} value set value "${namespace}:${objVariable}"`)
     func.output.push(`data modify storage ${namespace}:${tempVariable} type set value function`)
@@ -371,13 +413,23 @@ const handleNode = (node: Node, func: MCFunction): string => {
     if (node.type === "ReturnStatement") {
         if ((node as ReturnStatement).argument) {
             const argument = handleExpression((node as ReturnStatement).argument as Expression, func);
+            const returnVariable = func.asyncReturnValue ? namespace + ":" + func.asyncReturnValue :  "$(__return)"
+            const macro = func.asyncReturnValue ? "" : "$";
             if (argument.type === "literal") {
-                func.output.push(`$data modify storage $(__return) value set value ${argument.parsed}`)
-                func.output.push(`$data modify storage $(__return) type set value "${typeof argument.raw}"`)
+                func.output.push(`${macro}data modify storage ${returnVariable} value set value ${argument.parsed}`)
+                func.output.push(`${macro}data modify storage ${returnVariable} type set value "${typeof argument.raw}"`)
             } else if (argument.type === "variable") {
-                func.output.push(`$data modify storage $(__return) value set from storage ${namespace}:${argument.value} value`)
-                func.output.push(`$data modify storage $(__return) type set from storage ${namespace}:${argument.value} type`)
-                func.output.push(`$data modify storage $(__return) function set from storage ${namespace}:${argument.value} function`)
+                func.output.push(`${macro}data modify storage ${returnVariable} value set from storage ${namespace}:${argument.value} value`)
+                func.output.push(`${macro}data modify storage ${returnVariable} type set from storage ${namespace}:${argument.value} type`)
+                func.output.push(`${macro}data modify storage ${returnVariable} function set from storage ${namespace}:${argument.value} function`)
+            }
+            if (func.asyncReturnValue) {
+                const promiseResolveVariable = "temp-" + Math.random();
+                func.output.push(`data modify storage ${namespace}:${promiseResolveVariable} namespace set value "${namespace}"`)
+                func.output.push(`data modify storage ${namespace}:${promiseResolveVariable} storage set value "${namespace}:${func.asyncReturn}"`)
+                func.output.push(`data modify storage ${namespace}:${promiseResolveVariable} index set value 0`)
+                func.output.push(`data modify storage ${namespace}:${promiseResolveVariable} data set value "${namespace}:${func.asyncReturnValue}"`)
+                func.output.push(`function ${namespace}:resolvepromise with storage ${namespace}:${promiseResolveVariable}`)
             }
         }
         func.output.push(`return 0`)
@@ -1071,7 +1123,8 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                 type: "arrow",
                 scopeList: func.scopeList,
                 superClass: func.superClass,
-                that: func.that
+                that: func.that,
+                isAsync: true
             })[0]
         }
     }
@@ -1106,6 +1159,61 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             return {
                 type: "null"
             }
+        }
+    }
+    if (expression.type === "AwaitExpression") {
+        console.log(expression)
+        console.log(func)
+        const argument = handleExpression(expression.argument, func);
+        if (argument.type !== "variable") return {
+            type: "null"
+        }
+        
+        const getmemberTemp = "temp-" + Math.random();
+        const getmemberResult = "temp-" + Math.random();
+        
+        func.output.push(`data modify storage ${namespace}:${getmemberTemp} property set value "then"`)
+        func.output.push(`data modify storage ${namespace}:${getmemberTemp} object set from storage ${namespace}:${argument.value} value`)
+        func.output.push(`data modify storage ${namespace}:${getmemberTemp} result set value "${namespace}:${getmemberResult}"`)
+        func.output.push(`data modify storage ${namespace}:${getmemberTemp} namespace set value "${namespace}"`)
+        func.output.push(`function ${namespace}:getmemberinternal with storage ${namespace}:${getmemberTemp}`)
+        
+        const callTemp = "temp-" + Math.random();
+        const callResult = "temp-" + Math.random();
+        func.output.push(`data modify storage ${namespace}:${callTemp} function set from storage ${namespace}:${getmemberResult} function`)
+        
+        const functionName = "await-" + Math.random();
+        
+        const functionVariable = "temp-" + Math.random();
+        const objVariable = "temp-" + Math.random();
+        func.output.push(`data modify storage ${namespace}:${functionVariable} value set value "${namespace}:${objVariable}"`)
+        func.output.push(`data modify storage ${namespace}:${functionVariable} type set value function`)
+        func.output.push(`data modify storage ${namespace}:${functionVariable} function set value ${functionName}`)
+        func.output.push(`data modify storage ${namespace}:${objVariable} type set value "object"`)
+
+        func.output.push(`data modify storage ${namespace}:params 0 set value "${namespace}:${functionVariable}"`)
+        
+        func.output.push(`data modify storage ${namespace}:${callTemp} namespace set value "${namespace}"`)
+        func.output.push(`data modify storage ${namespace}:${callTemp} storage set value "${namespace}:params"`)
+
+        func.output.push(`data modify storage ${namespace}:params __this set value "${namespace}:${argument.value}"`)
+        func.output.push(`data modify storage ${namespace}:params __this_obj set from storage ${namespace}:${argument.value} value`)
+        
+        func.output.push(`data modify storage ${namespace}:params __return set value "${namespace}:${callResult}"`)
+        func.output.push(`function ${namespace}:call with storage ${namespace}:${callTemp}`)
+        
+
+        func.write();
+        func.output = [];
+        func.destination = "./output/" + functionName + ".mcfunction"
+
+        const awaitResult = "temp-" + Math.random();
+        func.output.push(`$data modify storage ${namespace}:${awaitResult} value set from storage $(0) value`)
+        func.output.push(`$data modify storage ${namespace}:${awaitResult} type set from storage $(0) type`)
+        func.output.push(`$data modify storage ${namespace}:${awaitResult} function set from storage $(0) function`)
+        return {
+            type: "variable",
+            value: awaitResult
         }
     }
     return {
