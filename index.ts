@@ -1,13 +1,18 @@
 import * as acorn from "acorn";
 import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Expression, CallExpression, Identifier, Literal, VariableDeclaration, AssignmentExpression, IfStatement, WhileStatement, ForStatement, SwitchStatement, ForOfStatement, ClassDeclaration, MethodDefinition, MemberExpression, ReturnStatement } from "acorn";
-import { writeFile, cp, readdir, unlink } from "node:fs/promises";
+import { readFile, writeFile, cp, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
 const code = `
+function test () {
+    globalThis.cat = 2;
+    console.log(globalThis.cat)
+    console.warn("warning")
+    console.error("error")
+    console.info("info")
+    console.debug("debug")
+}
 function main () {
-    const console = {
-        "log": (text) => __run("say " + text)
-    }
     class Promise {
         constructor (func) {
             __run("data modify storage " + __resolveObject(this) + " promise set value {listeners:[]}")
@@ -47,6 +52,10 @@ function main () {
 `
 
 const namespace = "test";
+
+const standard = acorn.parse(await readFile("./standard.js", {
+    "encoding": "utf-8"
+}), {ecmaVersion: 2020}).body
 
 const functions: Record<string, {
     params: Array<string>
@@ -178,8 +187,14 @@ const handleNode = (node: Node, func: MCFunction): string => {
     if (node.type === "FunctionDeclaration") {
         const subfunc = new MCFunction(func)
         for (const param of (node as FunctionDeclaration).params as Identifier[]) {
-            func.output.push(`$data modify storage ${namespace}:${func.blockScope} variables.${param.name}.value set value $(${param.name})`)
-            func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${param.name}.type set value "string"`)
+            subfunc.output.push(`$data modify storage ${namespace}:${func.blockScope} variables.${param.name}.value set value $(${param.name})`)
+            subfunc.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${param.name}.type set value "string"`)
+        }
+        subfunc.output.push("data modify storage test:global type set value object")
+        subfunc.output.push(`data modify storage test:global string set value {globalThis:{type:"object", value:"${namespace}:global"}}`)
+        for (const standardNode of standard) {
+            console.log(standardNode)
+            handleNode(standardNode, subfunc);
         }
         handleNode((node as FunctionDeclaration).body, subfunc)
         writeFile("./output/" + (node as FunctionDeclaration).id.name + ".mcfunction", subfunc.output.join("\n"))
@@ -368,7 +383,6 @@ const handleNode = (node: Node, func: MCFunction): string => {
         writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
     }
     if (node.type === "ClassDeclaration") {
-        console.log(node)
         const constructorMethod = (node as ClassDeclaration).body.body.find(node => "kind" in node ? node.kind === "constructor" : false) as MethodDefinition | undefined
         if (!constructorMethod) return "";
         const instanceVariable = "instance-" + Math.random()
@@ -523,6 +537,28 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             func.output.push(`data modify storage ${namespace}:${tempVariable} data set value "${namespace}:${dataExpression.value}"`)
             func.output.push(`function ${namespace}:resolvepromise with storage ${namespace}:${tempVariable}`)
             return subexpression
+        } else if (((expression as CallExpression)?.callee as Identifier)?.name === "__singleQuoteConcat") {
+            console.log(func.destination)
+            const tempVariable = "temp-" + Math.random();
+            const leftExpression = handleExpression(expression.arguments[0] as Expression, func);
+            if (leftExpression.type === "literal") {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} left set value ${leftExpression.parsed}`)
+            } else if (leftExpression.type === "variable") {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} left set from storage ${namespace}:${leftExpression.value} value`)
+            }
+            const rightExpression = handleExpression(expression.arguments[1] as Expression, func);
+            if (rightExpression.type === "literal") {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} right set value ${rightExpression.parsed}`)
+            } else if (rightExpression.type === "variable") {
+                func.output.push(`data modify storage ${namespace}:${tempVariable} right set from storage ${namespace}:${rightExpression.value} value`)
+            }
+            const resultVariable = "temp-" + Math.random();
+            func.output.push(`data modify storage ${namespace}:${tempVariable} storage set value "${namespace}:${resultVariable}"`)
+            func.output.push(`function ${namespace}:singlequoteconcat with storage ${namespace}:${tempVariable}`)
+            return {
+                type: "variable",
+                value: resultVariable
+            }
         } else {
             const callExpression = expression as CallExpression
             if (callExpression.callee.type === "Identifier" && callExpression?.callee?.name in functions) {
@@ -1019,7 +1055,6 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         const property: ExpressionOutput = expression.property.type === "Identifier" ? {type: "variable", value: expression.property.name} : handleExpression(expression.property as Expression, func)
         if (expression.object.type === "Super") {
             console.log("it's super member time!")
-            console.log(func)
             const tempVariable = "temp-" + Math.random();
             const resultVariable = "temp-" + Math.random();
             func.output.push(`data modify storage ${namespace}:${tempVariable} prototype set from storage ${namespace}:${func.superClass} value`)
@@ -1162,8 +1197,6 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         }
     }
     if (expression.type === "AwaitExpression") {
-        console.log(expression)
-        console.log(func)
         const argument = handleExpression(expression.argument, func);
         if (argument.type !== "variable") return {
             type: "null"

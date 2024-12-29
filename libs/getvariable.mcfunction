@@ -5,7 +5,8 @@ $execute if data storage $(namespace):temp {success:1} run data modify storage $
 $execute if data storage $(namespace):temp {success:1} run return 1
 
 $execute store success storage $(namespace):temp success int 1 run data get storage $(storage) scopes[$(index)]
-$execute if data storage $(namespace):temp {success:0} run say ReferenceError: $(name) is not defined
+$execute if data storage $(namespace):temp {success:0} store result storage $(namespace):temp result int 1 run function $(namespace):getmemberinternal {object:"$(namespace):global",property:"$(name)",result:"$(result)",namespace:"$(namespace)"}
+$execute if data storage $(namespace):temp {success:0} if data storage $(namespace):temp {result:0} run say ReferenceError: $(name) is not defined
 $execute if data storage $(namespace):temp {success:0} run return 0
 
 scoreboard objectives add temp dummy

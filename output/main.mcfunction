@@ -1,151 +1,191 @@
-data modify storage test:scope-0.1549006386804166 scopes set value ["scope-0.7092477183857968", "scope-0.1549006386804166"]
-data modify storage test:temp-0.797549693773222 type set value "object"
-data modify storage test:temp-0.797549693773222 value set value "test:obj-0.3768151651587337"
-data modify storage test:obj-0.3768151651587337 type set value "object"
-data modify storage test:temp-0.37656303563618254 value set value "test:temp-0.36691995387678145"
-data modify storage test:temp-0.37656303563618254 type set value function
-data modify storage test:temp-0.37656303563618254 function set value arrow0.3368449474884675
-data modify storage test:temp-0.36691995387678145 type set value "object"
-data modify storage test:obj-0.3768151651587337 string.log.value set from storage test:temp-0.37656303563618254 value
-data modify storage test:obj-0.3768151651587337 string.log.type set from storage test:temp-0.37656303563618254 type
-data modify storage test:obj-0.3768151651587337 string.log.function set from storage test:temp-0.37656303563618254 function
-data modify storage test:scope-0.1549006386804166 variables.console.value set from storage test:temp-0.797549693773222 value
-data modify storage test:scope-0.1549006386804166 variables.console.type set from storage test:temp-0.797549693773222 type
-data modify storage test:scope-0.1549006386804166 variables.console.function set from storage test:temp-0.797549693773222 function
-data modify storage test:temp-0.8241871879838774 value set value "test:temp-0.7815405800847757"
-data modify storage test:temp-0.8241871879838774 type set value function
-data modify storage test:temp-0.8241871879838774 function set value arrow0.3408245916726099
-data modify storage test:temp-0.7815405800847757 type set value "object"
-data modify storage test:scope-0.1549006386804166 variables.Promise.value set from storage test:temp-0.8241871879838774 value
-data modify storage test:scope-0.1549006386804166 variables.Promise.type set from storage test:temp-0.8241871879838774 type
-data modify storage test:scope-0.1549006386804166 variables.Promise.function set from storage test:temp-0.8241871879838774 function
-data modify storage test:temp-0.7815405800847757 string.prototype.value set value "test:obj-0.5617794202275519"
-data modify storage test:temp-0.7815405800847757 string.prototype.type set value "object"
-data modify storage test:obj-0.5617794202275519 type set value "object"
-data modify storage test:temp-0.5797706998111872 value set value "test:temp-0.2640769300390978"
-data modify storage test:temp-0.5797706998111872 type set value function
-data modify storage test:temp-0.5797706998111872 function set value arrow0.003093875845266769
-data modify storage test:temp-0.2640769300390978 type set value "object"
-data modify storage test:obj-0.5617794202275519 string.then.value set from storage test:temp-0.5797706998111872 value
-data modify storage test:obj-0.5617794202275519 string.then.type set from storage test:temp-0.5797706998111872 type
-data modify storage test:obj-0.5617794202275519 string.then.function set from storage test:temp-0.5797706998111872 function
-data modify storage test:scope-0.1549006386804166 variables.resolver.value set value "null"
-data modify storage test:scope-0.1549006386804166 variables.resolver.type set value "object"
-data modify storage test:temp-0.14772585237522629 namespace set value "test"
-data modify storage test:temp-0.14772585237522629 storage set value "test:scope-0.1549006386804166"
-data modify storage test:temp-0.14772585237522629 index set value "-2"
-data modify storage test:temp-0.14772585237522629 blockScope set value "scope-0.1549006386804166"
-data modify storage test:temp-0.14772585237522629 name set value "Promise"
-data modify storage test:temp-0.14772585237522629 result set value "test:temp-0.9539161942268365"
-function test:getvariable with storage test:temp-0.14772585237522629
-data modify storage test:temp-0.8655487495905095 function set from storage test:temp-0.9539161942268365 function
-data modify storage test:temp-0.8018450771592884 value set value "test:temp-0.3992324304564834"
-data modify storage test:temp-0.8018450771592884 type set value function
-data modify storage test:temp-0.8018450771592884 function set value arrow0.8940029073948912
-data modify storage test:temp-0.3992324304564834 type set value "object"
-data modify storage test:params 0 set value "test:temp-0.8018450771592884"
-data modify storage test:temp-0.8655487495905095 namespace set value "test"
-data modify storage test:temp-0.8655487495905095 storage set value "test:params"
-data modify storage test:temp-0.50075841535457 type set value "object"
-data modify storage test:temp-0.50075841535457 value set value "test:obj-0.5328890278459186"
-data modify storage test:obj-0.5328890278459186 type set value "object"
-data modify storage test:params __this set value "test:temp-0.50075841535457"
-data modify storage test:params __this_obj set from storage test:temp-0.50075841535457 value
-function test:call with storage test:temp-0.8655487495905095
-data modify storage test:scope-0.1549006386804166 variables.promise.value set from storage test:temp-0.50075841535457 value
-data modify storage test:scope-0.1549006386804166 variables.promise.type set from storage test:temp-0.50075841535457 type
-data modify storage test:scope-0.1549006386804166 variables.promise.function set from storage test:temp-0.50075841535457 function
-data modify storage test:temp-0.3065677998898524 value set value "test:temp-0.6856426528279348"
-data modify storage test:temp-0.3065677998898524 type set value function
-data modify storage test:temp-0.3065677998898524 function set value arrow0.6967737069017641
-data modify storage test:temp-0.6856426528279348 type set value "object"
-data modify storage test:scope-0.1549006386804166 variables.foo.value set from storage test:temp-0.3065677998898524 value
-data modify storage test:scope-0.1549006386804166 variables.foo.type set from storage test:temp-0.3065677998898524 type
-data modify storage test:scope-0.1549006386804166 variables.foo.function set from storage test:temp-0.3065677998898524 function
-data modify storage test:temp-0.07591715359053597 namespace set value "test"
-data modify storage test:temp-0.07591715359053597 storage set value "test:scope-0.1549006386804166"
-data modify storage test:temp-0.07591715359053597 index set value "-2"
-data modify storage test:temp-0.07591715359053597 blockScope set value "scope-0.1549006386804166"
-data modify storage test:temp-0.07591715359053597 name set value "console"
-data modify storage test:temp-0.07591715359053597 result set value "test:temp-0.5456848929656901"
-function test:getvariable with storage test:temp-0.07591715359053597
-data modify storage test:temp-0.4237633129934433 property set value "log"
-data modify storage test:temp-0.4237633129934433 object set value "test:temp-0.5456848929656901"
-data modify storage test:temp-0.4237633129934433 result set value "test:temp-0.5306708833204254"
-data modify storage test:temp-0.4237633129934433 namespace set value "test"
-function test:getmember with storage test:temp-0.4237633129934433
-data modify storage test:temp-0.7795156643703146 function set from storage test:temp-0.5306708833204254 function
-data modify storage test:temp-0.6550153666803312 namespace set value "test"
-data modify storage test:temp-0.6550153666803312 storage set value "test:scope-0.1549006386804166"
-data modify storage test:temp-0.6550153666803312 index set value "-2"
-data modify storage test:temp-0.6550153666803312 blockScope set value "scope-0.1549006386804166"
-data modify storage test:temp-0.6550153666803312 name set value "foo"
-data modify storage test:temp-0.6550153666803312 result set value "test:temp-0.2337928077801431"
-function test:getvariable with storage test:temp-0.6550153666803312
-data modify storage test:temp-0.6687629891778735 value set value "foo is test:temp-0.2337928077801431"
-data modify storage test:temp-0.6687629891778735 type set value string
-data modify storage test:params 0 set value "test:temp-0.6687629891778735"
-data modify storage test:temp-0.7795156643703146 namespace set value "test"
-data modify storage test:temp-0.7795156643703146 storage set value "test:params"
-data modify storage test:params __this set value "test:temp-0.5456848929656901"
-data modify storage test:params __this_obj set from storage test:temp-0.5456848929656901 value
-data modify storage test:params __return set value "test:temp-0.22500457474264124"
-function test:call with storage test:temp-0.7795156643703146
-data modify storage test:temp-0.9695806175587238 value set value "test:temp-0.8947037058051354"
-data modify storage test:temp-0.9695806175587238 type set value function
-data modify storage test:temp-0.9695806175587238 function set value arrow0.21466500222337936
-data modify storage test:temp-0.8947037058051354 type set value "object"
-data modify storage test:scope-0.1549006386804166 variables.magic.value set from storage test:temp-0.9695806175587238 value
-data modify storage test:scope-0.1549006386804166 variables.magic.type set from storage test:temp-0.9695806175587238 type
-data modify storage test:scope-0.1549006386804166 variables.magic.function set from storage test:temp-0.9695806175587238 function
-data modify storage test:temp-0.4055249511055544 namespace set value "test"
-data modify storage test:temp-0.4055249511055544 storage set value "test:scope-0.1549006386804166"
-data modify storage test:temp-0.4055249511055544 index set value "-2"
-data modify storage test:temp-0.4055249511055544 blockScope set value "scope-0.1549006386804166"
-data modify storage test:temp-0.4055249511055544 name set value "magic"
-data modify storage test:temp-0.4055249511055544 result set value "test:temp-0.21762235490111448"
-function test:getvariable with storage test:temp-0.4055249511055544
-data modify storage test:temp-0.5930402620924338 function set from storage test:temp-0.21762235490111448 function
-data modify storage test:temp-0.5930402620924338 namespace set value "test"
-data modify storage test:temp-0.5930402620924338 storage set value "test:params"
-data modify storage test:params __return set value "test:temp-0.7478569378932001"
-function test:call with storage test:temp-0.5930402620924338
-data modify storage test:temp-0.5295343657107862 namespace set value "test"
-data modify storage test:temp-0.5295343657107862 storage set value "test:scope-0.1549006386804166"
-data modify storage test:temp-0.5295343657107862 index set value "-2"
-data modify storage test:temp-0.5295343657107862 blockScope set value "scope-0.1549006386804166"
-data modify storage test:temp-0.5295343657107862 name set value "promise"
-data modify storage test:temp-0.5295343657107862 result set value "test:temp-0.08100663197167768"
-function test:getvariable with storage test:temp-0.5295343657107862
-data modify storage test:temp-0.811188792463328 property set value "then"
-data modify storage test:temp-0.811188792463328 object set value "test:temp-0.08100663197167768"
-data modify storage test:temp-0.811188792463328 result set value "test:temp-0.3578294015151726"
-data modify storage test:temp-0.811188792463328 namespace set value "test"
-function test:getmember with storage test:temp-0.811188792463328
-data modify storage test:temp-0.125244519035696 function set from storage test:temp-0.3578294015151726 function
-data modify storage test:temp-0.06990451247558604 value set value "test:temp-0.35612004283516385"
-data modify storage test:temp-0.06990451247558604 type set value function
-data modify storage test:temp-0.06990451247558604 function set value arrow0.7090133664706616
-data modify storage test:temp-0.35612004283516385 type set value "object"
-data modify storage test:params 0 set value "test:temp-0.06990451247558604"
-data modify storage test:temp-0.125244519035696 namespace set value "test"
-data modify storage test:temp-0.125244519035696 storage set value "test:params"
-data modify storage test:params __this set value "test:temp-0.08100663197167768"
-data modify storage test:params __this_obj set from storage test:temp-0.08100663197167768 value
-data modify storage test:params __return set value "test:temp-0.10367773376441924"
-function test:call with storage test:temp-0.125244519035696
-data modify storage test:temp-0.9636473682696636 namespace set value "test"
-data modify storage test:temp-0.9636473682696636 storage set value "test:scope-0.1549006386804166"
-data modify storage test:temp-0.9636473682696636 index set value "-2"
-data modify storage test:temp-0.9636473682696636 blockScope set value "scope-0.1549006386804166"
-data modify storage test:temp-0.9636473682696636 name set value "resolver"
-data modify storage test:temp-0.9636473682696636 result set value "test:temp-0.34949933094787"
-function test:getvariable with storage test:temp-0.9636473682696636
-data modify storage test:temp-0.7142425378112564 function set from storage test:temp-0.34949933094787 function
-data modify storage test:temp-0.5090699581110979 value set value "test"
-data modify storage test:temp-0.5090699581110979 type set value string
-data modify storage test:params 0 set value "test:temp-0.5090699581110979"
-data modify storage test:temp-0.7142425378112564 namespace set value "test"
-data modify storage test:temp-0.7142425378112564 storage set value "test:params"
-data modify storage test:params __return set value "test:temp-0.9654365268083565"
-function test:call with storage test:temp-0.7142425378112564
+data modify storage test:scope-0.35231898384148486 scopes set value ["scope-0.6145783293361887", "scope-0.35231898384148486"]
+data modify storage test:global type set value object
+data modify storage test:global string set value {globalThis:{type:"object", value:"test:global"}}
+data modify storage test:temp-0.42121470434811437 namespace set value "test"
+data modify storage test:temp-0.42121470434811437 storage set value "test:scope-0.35231898384148486"
+data modify storage test:temp-0.42121470434811437 index set value "-2"
+data modify storage test:temp-0.42121470434811437 blockScope set value "scope-0.35231898384148486"
+data modify storage test:temp-0.42121470434811437 name set value "globalThis"
+data modify storage test:temp-0.42121470434811437 result set value "test:temp-0.32164543278125934"
+function test:getvariable with storage test:temp-0.42121470434811437
+data modify storage test:temp-0.45820970055069443 type set value "object"
+data modify storage test:temp-0.45820970055069443 value set value "test:obj-0.43905365277591446"
+data modify storage test:obj-0.43905365277591446 type set value "object"
+data modify storage test:temp-0.7496754253639705 value set value "test:temp-0.7006709195373839"
+data modify storage test:temp-0.7496754253639705 type set value function
+data modify storage test:temp-0.7496754253639705 function set value arrow0.8366870495277052
+data modify storage test:temp-0.7006709195373839 type set value "object"
+data modify storage test:obj-0.43905365277591446 string.log.value set from storage test:temp-0.7496754253639705 value
+data modify storage test:obj-0.43905365277591446 string.log.type set from storage test:temp-0.7496754253639705 type
+data modify storage test:obj-0.43905365277591446 string.log.function set from storage test:temp-0.7496754253639705 function
+data modify storage test:temp-0.5585564008017204 value set value "test:temp-0.16661305131644777"
+data modify storage test:temp-0.5585564008017204 type set value function
+data modify storage test:temp-0.5585564008017204 function set value arrow0.16438704589439124
+data modify storage test:temp-0.16661305131644777 type set value "object"
+data modify storage test:obj-0.43905365277591446 string.warn.value set from storage test:temp-0.5585564008017204 value
+data modify storage test:obj-0.43905365277591446 string.warn.type set from storage test:temp-0.5585564008017204 type
+data modify storage test:obj-0.43905365277591446 string.warn.function set from storage test:temp-0.5585564008017204 function
+data modify storage test:temp-0.2952183490152944 value set value "test:temp-0.7674089270648184"
+data modify storage test:temp-0.2952183490152944 type set value function
+data modify storage test:temp-0.2952183490152944 function set value arrow0.7269960239975065
+data modify storage test:temp-0.7674089270648184 type set value "object"
+data modify storage test:obj-0.43905365277591446 string.error.value set from storage test:temp-0.2952183490152944 value
+data modify storage test:obj-0.43905365277591446 string.error.type set from storage test:temp-0.2952183490152944 type
+data modify storage test:obj-0.43905365277591446 string.error.function set from storage test:temp-0.2952183490152944 function
+data modify storage test:temp-0.41071446913428067 value set value "test:temp-0.06476008758670182"
+data modify storage test:temp-0.41071446913428067 type set value function
+data modify storage test:temp-0.41071446913428067 function set value arrow0.1616990891034018
+data modify storage test:temp-0.06476008758670182 type set value "object"
+data modify storage test:obj-0.43905365277591446 string.info.value set from storage test:temp-0.41071446913428067 value
+data modify storage test:obj-0.43905365277591446 string.info.type set from storage test:temp-0.41071446913428067 type
+data modify storage test:obj-0.43905365277591446 string.info.function set from storage test:temp-0.41071446913428067 function
+data modify storage test:temp-0.030694488912939577 value set value "test:temp-0.9118706572358178"
+data modify storage test:temp-0.030694488912939577 type set value function
+data modify storage test:temp-0.030694488912939577 function set value arrow0.08765683930567014
+data modify storage test:temp-0.9118706572358178 type set value "object"
+data modify storage test:obj-0.43905365277591446 string.debug.value set from storage test:temp-0.030694488912939577 value
+data modify storage test:obj-0.43905365277591446 string.debug.type set from storage test:temp-0.030694488912939577 type
+data modify storage test:obj-0.43905365277591446 string.debug.function set from storage test:temp-0.030694488912939577 function
+data modify storage test:temp-0.3869033376278128 storage set from storage test:temp-0.32164543278125934 value
+data modify storage test:temp-0.3869033376278128 property set value "console"
+data modify storage test:temp-0.3869033376278128 value set from storage test:temp-0.45820970055069443 value
+data modify storage test:temp-0.3869033376278128 type set from storage test:temp-0.45820970055069443 type
+data modify storage test:temp-0.3869033376278128 function set from storage test:temp-0.45820970055069443 function
+function test:setmember with storage test:temp-0.3869033376278128
+data modify storage test:temp-0.410285330241303 value set value "test:temp-0.3138147607716334"
+data modify storage test:temp-0.410285330241303 type set value function
+data modify storage test:temp-0.410285330241303 function set value arrow0.602835242199538
+data modify storage test:temp-0.3138147607716334 type set value "object"
+data modify storage test:scope-0.35231898384148486 variables.Promise.value set from storage test:temp-0.410285330241303 value
+data modify storage test:scope-0.35231898384148486 variables.Promise.type set from storage test:temp-0.410285330241303 type
+data modify storage test:scope-0.35231898384148486 variables.Promise.function set from storage test:temp-0.410285330241303 function
+data modify storage test:temp-0.3138147607716334 string.prototype.value set value "test:obj-0.08058840489944308"
+data modify storage test:temp-0.3138147607716334 string.prototype.type set value "object"
+data modify storage test:obj-0.08058840489944308 type set value "object"
+data modify storage test:temp-0.7570352160853306 value set value "test:temp-0.5028739206639588"
+data modify storage test:temp-0.7570352160853306 type set value function
+data modify storage test:temp-0.7570352160853306 function set value arrow0.9607928733481718
+data modify storage test:temp-0.5028739206639588 type set value "object"
+data modify storage test:obj-0.08058840489944308 string.then.value set from storage test:temp-0.7570352160853306 value
+data modify storage test:obj-0.08058840489944308 string.then.type set from storage test:temp-0.7570352160853306 type
+data modify storage test:obj-0.08058840489944308 string.then.function set from storage test:temp-0.7570352160853306 function
+data modify storage test:scope-0.35231898384148486 variables.resolver.value set value "null"
+data modify storage test:scope-0.35231898384148486 variables.resolver.type set value "object"
+data modify storage test:temp-0.4312128106074572 namespace set value "test"
+data modify storage test:temp-0.4312128106074572 storage set value "test:scope-0.35231898384148486"
+data modify storage test:temp-0.4312128106074572 index set value "-2"
+data modify storage test:temp-0.4312128106074572 blockScope set value "scope-0.35231898384148486"
+data modify storage test:temp-0.4312128106074572 name set value "Promise"
+data modify storage test:temp-0.4312128106074572 result set value "test:temp-0.9700474349341014"
+function test:getvariable with storage test:temp-0.4312128106074572
+data modify storage test:temp-0.25650650128185704 function set from storage test:temp-0.9700474349341014 function
+data modify storage test:temp-0.007613684611038174 value set value "test:temp-0.18567476784203596"
+data modify storage test:temp-0.007613684611038174 type set value function
+data modify storage test:temp-0.007613684611038174 function set value arrow0.3737532327081291
+data modify storage test:temp-0.18567476784203596 type set value "object"
+data modify storage test:params 0 set value "test:temp-0.007613684611038174"
+data modify storage test:temp-0.25650650128185704 namespace set value "test"
+data modify storage test:temp-0.25650650128185704 storage set value "test:params"
+data modify storage test:temp-0.8069293485596797 type set value "object"
+data modify storage test:temp-0.8069293485596797 value set value "test:obj-0.692970679530377"
+data modify storage test:obj-0.692970679530377 type set value "object"
+data modify storage test:params __this set value "test:temp-0.8069293485596797"
+data modify storage test:params __this_obj set from storage test:temp-0.8069293485596797 value
+function test:call with storage test:temp-0.25650650128185704
+data modify storage test:scope-0.35231898384148486 variables.promise.value set from storage test:temp-0.8069293485596797 value
+data modify storage test:scope-0.35231898384148486 variables.promise.type set from storage test:temp-0.8069293485596797 type
+data modify storage test:scope-0.35231898384148486 variables.promise.function set from storage test:temp-0.8069293485596797 function
+data modify storage test:temp-0.6298682690397254 value set value "test:temp-0.27310891809212445"
+data modify storage test:temp-0.6298682690397254 type set value function
+data modify storage test:temp-0.6298682690397254 function set value arrow0.26242860098436527
+data modify storage test:temp-0.27310891809212445 type set value "object"
+data modify storage test:scope-0.35231898384148486 variables.foo.value set from storage test:temp-0.6298682690397254 value
+data modify storage test:scope-0.35231898384148486 variables.foo.type set from storage test:temp-0.6298682690397254 type
+data modify storage test:scope-0.35231898384148486 variables.foo.function set from storage test:temp-0.6298682690397254 function
+data modify storage test:temp-0.6030541485117678 namespace set value "test"
+data modify storage test:temp-0.6030541485117678 storage set value "test:scope-0.35231898384148486"
+data modify storage test:temp-0.6030541485117678 index set value "-2"
+data modify storage test:temp-0.6030541485117678 blockScope set value "scope-0.35231898384148486"
+data modify storage test:temp-0.6030541485117678 name set value "console"
+data modify storage test:temp-0.6030541485117678 result set value "test:temp-0.991282054973319"
+function test:getvariable with storage test:temp-0.6030541485117678
+data modify storage test:temp-0.5543946486118486 property set value "log"
+data modify storage test:temp-0.5543946486118486 object set value "test:temp-0.991282054973319"
+data modify storage test:temp-0.5543946486118486 result set value "test:temp-0.20917139625773074"
+data modify storage test:temp-0.5543946486118486 namespace set value "test"
+function test:getmember with storage test:temp-0.5543946486118486
+data modify storage test:temp-0.27805007208151644 function set from storage test:temp-0.20917139625773074 function
+data modify storage test:temp-0.3512021643617306 namespace set value "test"
+data modify storage test:temp-0.3512021643617306 storage set value "test:scope-0.35231898384148486"
+data modify storage test:temp-0.3512021643617306 index set value "-2"
+data modify storage test:temp-0.3512021643617306 blockScope set value "scope-0.35231898384148486"
+data modify storage test:temp-0.3512021643617306 name set value "foo"
+data modify storage test:temp-0.3512021643617306 result set value "test:temp-0.32697580970104057"
+function test:getvariable with storage test:temp-0.3512021643617306
+data modify storage test:temp-0.6395767889563319 value set value "foo is test:temp-0.32697580970104057"
+data modify storage test:temp-0.6395767889563319 type set value string
+data modify storage test:params 0 set value "test:temp-0.6395767889563319"
+data modify storage test:temp-0.27805007208151644 namespace set value "test"
+data modify storage test:temp-0.27805007208151644 storage set value "test:params"
+data modify storage test:params __this set value "test:temp-0.991282054973319"
+data modify storage test:params __this_obj set from storage test:temp-0.991282054973319 value
+data modify storage test:params __return set value "test:temp-0.25358401896891836"
+function test:call with storage test:temp-0.27805007208151644
+data modify storage test:temp-0.8458439630907199 value set value "test:temp-0.2604306144479509"
+data modify storage test:temp-0.8458439630907199 type set value function
+data modify storage test:temp-0.8458439630907199 function set value arrow0.47910001626670184
+data modify storage test:temp-0.2604306144479509 type set value "object"
+data modify storage test:scope-0.35231898384148486 variables.magic.value set from storage test:temp-0.8458439630907199 value
+data modify storage test:scope-0.35231898384148486 variables.magic.type set from storage test:temp-0.8458439630907199 type
+data modify storage test:scope-0.35231898384148486 variables.magic.function set from storage test:temp-0.8458439630907199 function
+data modify storage test:temp-0.7875338691880323 namespace set value "test"
+data modify storage test:temp-0.7875338691880323 storage set value "test:scope-0.35231898384148486"
+data modify storage test:temp-0.7875338691880323 index set value "-2"
+data modify storage test:temp-0.7875338691880323 blockScope set value "scope-0.35231898384148486"
+data modify storage test:temp-0.7875338691880323 name set value "magic"
+data modify storage test:temp-0.7875338691880323 result set value "test:temp-0.2626781516805381"
+function test:getvariable with storage test:temp-0.7875338691880323
+data modify storage test:temp-0.31924930798246187 function set from storage test:temp-0.2626781516805381 function
+data modify storage test:temp-0.31924930798246187 namespace set value "test"
+data modify storage test:temp-0.31924930798246187 storage set value "test:params"
+data modify storage test:params __return set value "test:temp-0.5276253901452451"
+function test:call with storage test:temp-0.31924930798246187
+data modify storage test:temp-0.8855554400729341 namespace set value "test"
+data modify storage test:temp-0.8855554400729341 storage set value "test:scope-0.35231898384148486"
+data modify storage test:temp-0.8855554400729341 index set value "-2"
+data modify storage test:temp-0.8855554400729341 blockScope set value "scope-0.35231898384148486"
+data modify storage test:temp-0.8855554400729341 name set value "promise"
+data modify storage test:temp-0.8855554400729341 result set value "test:temp-0.8103455105472319"
+function test:getvariable with storage test:temp-0.8855554400729341
+data modify storage test:temp-0.7745676072597235 property set value "then"
+data modify storage test:temp-0.7745676072597235 object set value "test:temp-0.8103455105472319"
+data modify storage test:temp-0.7745676072597235 result set value "test:temp-0.016390797913265587"
+data modify storage test:temp-0.7745676072597235 namespace set value "test"
+function test:getmember with storage test:temp-0.7745676072597235
+data modify storage test:temp-0.2839216411436817 function set from storage test:temp-0.016390797913265587 function
+data modify storage test:temp-0.13640440837660417 value set value "test:temp-0.44698028918386956"
+data modify storage test:temp-0.13640440837660417 type set value function
+data modify storage test:temp-0.13640440837660417 function set value arrow0.9821336805160404
+data modify storage test:temp-0.44698028918386956 type set value "object"
+data modify storage test:params 0 set value "test:temp-0.13640440837660417"
+data modify storage test:temp-0.2839216411436817 namespace set value "test"
+data modify storage test:temp-0.2839216411436817 storage set value "test:params"
+data modify storage test:params __this set value "test:temp-0.8103455105472319"
+data modify storage test:params __this_obj set from storage test:temp-0.8103455105472319 value
+data modify storage test:params __return set value "test:temp-0.7043738210504397"
+function test:call with storage test:temp-0.2839216411436817
+data modify storage test:temp-0.7147534434574555 namespace set value "test"
+data modify storage test:temp-0.7147534434574555 storage set value "test:scope-0.35231898384148486"
+data modify storage test:temp-0.7147534434574555 index set value "-2"
+data modify storage test:temp-0.7147534434574555 blockScope set value "scope-0.35231898384148486"
+data modify storage test:temp-0.7147534434574555 name set value "resolver"
+data modify storage test:temp-0.7147534434574555 result set value "test:temp-0.7160646296781942"
+function test:getvariable with storage test:temp-0.7147534434574555
+data modify storage test:temp-0.9154140254720122 function set from storage test:temp-0.7160646296781942 function
+data modify storage test:temp-0.3654975175131704 value set value "test"
+data modify storage test:temp-0.3654975175131704 type set value string
+data modify storage test:params 0 set value "test:temp-0.3654975175131704"
+data modify storage test:temp-0.9154140254720122 namespace set value "test"
+data modify storage test:temp-0.9154140254720122 storage set value "test:params"
+data modify storage test:params __return set value "test:temp-0.7435149055408931"
+function test:call with storage test:temp-0.9154140254720122
