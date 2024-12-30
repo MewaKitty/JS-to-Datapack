@@ -10,5 +10,5 @@ $execute if data storage $(namespace):temp-member {success:0} if data storage $(
 $execute if data storage $(namespace):temp-member {success:0} run data modify storage $(namespace):temp namespace set value "$(namespace)"
 $execute if data storage $(namespace):temp-member {success:0} run data modify storage $(namespace):temp result set value "$(result)"
 $execute if data storage $(namespace):temp-member {success:0} run data modify storage $(namespace):temp property set value "$(property)"
-$execute if data storage $(namespace):temp-member {success:0} run data modify storage $(namespace):temp prototype set from storage $(object) prototype
-$execute if data storage $(namespace):temp-member {success:0} run function $(namespace):prototypemember with storage $(namespace):temp
+$execute if data storage $(namespace):temp-member {success:0} run data modify storage $(namespace):temp object set from storage $(object) prototype
+$execute if data storage $(namespace):temp-member {success:0} run function $(namespace):getmemberinternal with storage $(namespace):temp

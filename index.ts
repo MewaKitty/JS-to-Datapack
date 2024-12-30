@@ -5,13 +5,12 @@ import path from "node:path";
 
 const code = `
 function test () {
-    globalThis.cat = 2;
-    console.log(globalThis.cat)
-    console.warn("warning")
-    console.error("error")
-    console.info("info")
-    console.debug("debug")
-}
+    console.debug("test".repeat(4))
+    const arr = ["a", "b", "c", "d"]
+    for (const element of arr) {
+        console.log(element)
+    }
+}/*
 function main () {
     class Promise {
         constructor (func) {
@@ -48,7 +47,7 @@ function main () {
         console.log("then")
     })
     resolver("test")
-}
+}*/
 `
 
 const namespace = "test";
@@ -122,15 +121,19 @@ type ExpressionLiteralOutput = {
 type ExpressionVariableOutput = {
     type: "variable",
     value: string,
-    object?: ExpressionVariableOutput
+    object?: ExpressionLiteralOutput | ExpressionVariableOutput
 }
 type ExpressionOutput = ExpressionNullOutput | ExpressionLiteralOutput | ExpressionVariableOutput;
 
 const generateIfLines = (func: MCFunction, test: ExpressionVariableOutput, functionName: string) => {
+    const additional = (func.type === "arrow" || func.type === "class") ? ` {__this:"$(__this)",__this_obj:"$(__this_obj)",__new_target:"$(__new_target)",__return:"$(__return)"}` : ""
+    const prefix = (func.type === "arrow" || func.type === "class") ? "$" : ""
     func.output.push(`data modify storage ${namespace}:temp-result result set value 0`)
-    func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:true} run function ${namespace}:${functionName}`)
-    func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"number"} unless data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionName}`)
-    func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"string"} unless data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionName}`)
+    func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:true} run function ${namespace}:${functionName}${additional}`)
+    func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"number"} unless data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionName}${additional}`)
+    func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"string"} unless data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionName}${additional}`)
+    func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"object"} run function ${namespace}:${functionName}${additional}`)
+    func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"function"} run function ${namespace}:${functionName}${additional}`)
     func.output.push(`execute if data storage ${namespace}:temp-result {result:-2000000000} run return -2000000000`)
 }
 
@@ -164,7 +167,7 @@ const generateFunction = (params: Identifier[], isExpression: boolean, body: Nod
     if (that) {
         subfunc.output.push(`$data modify storage $(__this) type set value "object"`)
         subfunc.output.push(`$data modify storage $(__this) value set from storage ${namespace}:${that} value`)
-        if (isConstructor) subfunc.output.push(`$data modify storage $(__this_obj) prototype set value "${namespace}:${objVariable}"`)
+        if (isConstructor) subfunc.output.push(`$data modify storage $(__this_obj) prototype set from storage ${namespace}:${objVariable} string.prototype.value`)
     }
     if (metadata.isAsync) {
         const promiseResolveVariable = "temp-" + Math.random();
@@ -181,6 +184,64 @@ const generateFunction = (params: Identifier[], isExpression: boolean, body: Nod
     func.output.push(`data modify storage ${namespace}:${tempVariable} function set value ${functionName}`)
     func.output.push(`data modify storage ${namespace}:${objVariable} type set value "object"`)
     return [tempVariable, objVariable];
+}
+
+const generateClass = (node: acorn.ClassExpression | acorn.ClassDeclaration, func: MCFunction): ExpressionOutput => {
+
+    const constructorMethod = node.body.body.find(node => "kind" in node ? node.kind === "constructor" : false) as MethodDefinition | undefined
+    if (!constructorMethod) return {
+        type: "null"
+    };
+    const instanceVariable = "instance-" + Math.random()
+
+    let superClass = null;
+    
+    if (node.superClass) {
+        superClass = handleExpression(node.superClass as Expression, func)
+        console.log(superClass)
+        if (superClass.type !== "variable") return {
+            type: "null"
+        };
+    }
+    const [constructorVariable, objVariable] = generateFunction(constructorMethod.value.params as Identifier[], constructorMethod.value.expression, constructorMethod.value.body, func, instanceVariable, true, {
+        superClass: superClass?.value,
+        scopeList: func.scopeList,
+        type: "class"
+    });
+
+    if (node.id) {
+        const className = node.id.name;
+        func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${className}.value set from storage ${namespace}:${constructorVariable} value`)
+        func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${className}.type set from storage ${namespace}:${constructorVariable} type`)
+        func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${className}.function set from storage ${namespace}:${constructorVariable} function`)
+    }
+    const prototypeVariable = "obj-" + Math.random();
+    func.output.push(`data modify storage ${namespace}:${objVariable} string.prototype.value set value "${namespace}:${prototypeVariable}"`)
+    func.output.push(`data modify storage ${namespace}:${objVariable} string.prototype.type set value "object"`)
+    func.output.push(`data modify storage ${namespace}:${prototypeVariable} type set value "object"`)
+    
+    if (superClass) {
+        const prototypeSetVariable = "temp-" + Math.random();
+        func.output.push(`data modify storage ${namespace}:${prototypeSetVariable} object set value "${namespace}:${prototypeVariable}"`)
+        func.output.push(`data modify storage ${namespace}:${prototypeSetVariable} class set from storage ${namespace}:${superClass.value} value`)
+        func.output.push(`function ${namespace}:setclassprototype with storage ${namespace}:${prototypeSetVariable}`)
+    }
+    const methods = node.body.body.filter(node => "kind" in node ? node.kind === "method" : false) as MethodDefinition[];
+    for (const method of methods) {
+        const methodName = (method.key as Identifier).name;
+        const methodVariable = generateFunction(method.value.params as Identifier[], method.value.expression, method.value.body, func, instanceVariable, false, {
+            superClass: superClass?.value,
+            scopeList: func.scopeList,
+            type: "class"
+        })[0];
+        func.output.push(`data modify storage ${namespace}:${prototypeVariable} string.${methodName}.value set from storage ${namespace}:${methodVariable} value`)
+        func.output.push(`data modify storage ${namespace}:${prototypeVariable} string.${methodName}.type set from storage ${namespace}:${methodVariable} type`)
+        func.output.push(`data modify storage ${namespace}:${prototypeVariable} string.${methodName}.function set from storage ${namespace}:${methodVariable} function`)
+    }
+    return {
+        type: "variable",
+        value: constructorVariable
+    }
 }
 
 const handleNode = (node: Node, func: MCFunction): string => {
@@ -239,6 +300,8 @@ const handleNode = (node: Node, func: MCFunction): string => {
             writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
         } else if (test.type === "variable") {
             const functionName = "block" + Math.random()
+            const additional = (func.type === "arrow" || func.type === "class") ? ` {__this:"$(__this)",__this_obj:"$(__this_obj)",__new_target:"$(__new_target)",__return:"$(__return)"}` : ""
+            const prefix = (func.type === "arrow" || func.type === "class") ? "$" : ""
             generateIfLines(func, test, functionName)
             const subfunc = new MCFunction(func)
             handleNode(ifStatement.consequent, subfunc)
@@ -246,9 +309,11 @@ const handleNode = (node: Node, func: MCFunction): string => {
             if (ifStatement.alternate) {
                 const functionAlternate = "block" + Math.random()
                 func.output.push(`data modify storage ${namespace}:temp-result result set value 0`)
-                func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:false} run function ${namespace}:${functionAlternate}`)
-                func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionAlternate}`)
-                func.output.push(`execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionAlternate}`)
+                func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:false} run function ${namespace}:${functionAlternate}${additional}`)
+                func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionAlternate}${additional}`)
+                func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:""} run function ${namespace}:${functionAlternate}${additional}`)
+                func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"object",value:"null"} run function ${namespace}:${functionAlternate}${additional}`)
+                func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"undefined"} run function ${namespace}:${functionAlternate}${additional}`)
                 func.output.push(`execute if data storage ${namespace}:temp-result {result:-2000000000} run return -2000000000`)
                 const alternatefunc = new MCFunction(func)
                 handleNode(ifStatement.alternate, alternatefunc)
@@ -287,7 +352,8 @@ const handleNode = (node: Node, func: MCFunction): string => {
             superClass: subfunc.superClass,
             that: subfunc.that,
             output: func.output,
-            skipScope: true
+            skipScope: true,
+            type: func.type
         })
         if (forStatement.init) handleNode(forStatement.init, initfunc);
         const functionName = "block" + Math.random()
@@ -376,53 +442,14 @@ const handleNode = (node: Node, func: MCFunction): string => {
         func.output.push(`data modify storage ${namespace}:${tempVariable} function set value "${namespace}:${functionName}"`)
         func.output.push(`function ${namespace}:looparray with storage ${namespace}:${tempVariable}`)
         const subfunc = new MCFunction(func)
-        subfunc.output.push(`data modify storage ${namespace}:${variableName} value set from storage ${namespace}:temp data.value`)
-        subfunc.output.push(`data modify storage ${namespace}:${variableName} type set from storage ${namespace}:temp data.type`)
-        subfunc.output.push(`data modify storage ${namespace}:${variableName} function set from storage ${namespace}:temp data.function`)
+        subfunc.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${variableName}.value set from storage ${namespace}:temp data.value`)
+        subfunc.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${variableName}.type set from storage ${namespace}:temp data.type`)
+        subfunc.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${variableName}.function set from storage ${namespace}:temp data.function`)
         handleNode(forOf.body, subfunc)
         writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
     }
     if (node.type === "ClassDeclaration") {
-        const constructorMethod = (node as ClassDeclaration).body.body.find(node => "kind" in node ? node.kind === "constructor" : false) as MethodDefinition | undefined
-        if (!constructorMethod) return "";
-        const instanceVariable = "instance-" + Math.random()
-
-        let superClass = null;
-        
-        if ((node as ClassDeclaration).superClass) {
-            superClass = handleExpression((node as ClassDeclaration).superClass as Expression, func)
-            console.log(superClass)
-            if (superClass.type !== "variable") return "";
-        }
-        const [constructorVariable, objVariable] = generateFunction(constructorMethod.value.params as Identifier[], constructorMethod.value.expression, constructorMethod.value.body, func, instanceVariable, true, {
-            superClass: superClass?.value,
-            scopeList: func.scopeList
-        });
-
-        const className = (node as ClassDeclaration).id.name;
-        func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${className}.value set from storage ${namespace}:${constructorVariable} value`)
-        func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${className}.type set from storage ${namespace}:${constructorVariable} type`)
-        func.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${className}.function set from storage ${namespace}:${constructorVariable} function`)
-        
-        const prototypeVariable = "obj-" + Math.random();
-        func.output.push(`data modify storage ${namespace}:${objVariable} string.prototype.value set value "${namespace}:${prototypeVariable}"`)
-        func.output.push(`data modify storage ${namespace}:${objVariable} string.prototype.type set value "object"`)
-        func.output.push(`data modify storage ${namespace}:${prototypeVariable} type set value "object"`)
-        
-        if (superClass) {
-            func.output.push(`data modify storage ${namespace}:${prototypeVariable} prototype set from storage ${namespace}:${superClass.value} value`)
-        }
-        const methods = (node as ClassDeclaration).body.body.filter(node => "kind" in node ? node.kind === "method" : false) as MethodDefinition[];
-        for (const method of methods) {
-            const methodName = (method.key as Identifier).name;
-            const methodVariable = generateFunction(method.value.params as Identifier[], method.value.expression, method.value.body, func, instanceVariable, false, {
-                superClass: superClass?.value,
-                scopeList: func.scopeList
-            })[0];
-            func.output.push(`data modify storage ${namespace}:${prototypeVariable} string.${methodName}.value set from storage ${namespace}:${methodVariable} value`)
-            func.output.push(`data modify storage ${namespace}:${prototypeVariable} string.${methodName}.type set from storage ${namespace}:${methodVariable} type`)
-            func.output.push(`data modify storage ${namespace}:${prototypeVariable} string.${methodName}.function set from storage ${namespace}:${methodVariable} function`)
-        }
+        generateClass(node as acorn.ClassDeclaration, func)
     }
     if (node.type === "ReturnStatement") {
         if ((node as ReturnStatement).argument) {
@@ -605,9 +632,21 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                 func.output.push(`data modify storage ${namespace}:${tempVariable} storage set value "${namespace}:params"`)
 
                 if (expression.callee.type === "MemberExpression") {
-                    func.output.push(`data modify storage ${namespace}:params __this set value "${namespace}:${callee.object?.value}"`)
-                    func.output.push(`data modify storage ${namespace}:params __this_obj set from storage ${namespace}:${callee.object?.value} value`)
+                    if (callee.type === "variable") {
+                        const objectName = (callee.object as ExpressionVariableOutput | undefined)?.value
+                        func.output.push(`execute if data storage ${namespace}:${objectName} {type:"object"} run data modify storage ${namespace}:params __this set value "${namespace}:${objectName}"`)
+                        func.output.push(`execute if data storage ${namespace}:${objectName} {type:"object"} run data modify storage ${namespace}:params __this_obj set from storage ${namespace}:${objectName} value`)
+                        func.output.push(`execute unless data storage ${namespace}:${objectName} {type:"object"} run data modify storage ${namespace}:params __this set value "${namespace}:temp-obj-var"`)
+                        func.output.push(`execute unless data storage ${namespace}:${objectName} {type:"object"} run data modify storage ${namespace}:params __this_obj set value "${namespace}:temp-obj"`)
+                    } else if (callee.type === "literal") {
+                        func.output.push(`data modify storage ${namespace}:params __this set value "${namespace}:temp-obj-var"`)
+                        func.output.push(`data modify storage ${namespace}:params __this_obj set value "${namespace}:temp-obj"`)
+                    }
+                } else {
+                    func.output.push(`data modify storage ${namespace}:params __this set value "undefined"`)
+                    func.output.push(`data modify storage ${namespace}:params __this_obj set value "undefined"`)
                 }
+                func.output.push(`data modify storage ${namespace}:params __new_target set value "${namespace}:undefined"`)
                 func.output.push(`data modify storage ${namespace}:params __return set value "${namespace}:${resultVariable}"`)
                 func.output.push(`function ${namespace}:call with storage ${namespace}:${tempVariable}`)
                 return {
@@ -647,7 +686,9 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
 
         func.output.push(`data modify storage ${namespace}:params __this set value "${namespace}:${instanceVariable}"`)
         func.output.push(`data modify storage ${namespace}:params __this_obj set from storage ${namespace}:${instanceVariable} value`)
-
+        func.output.push(`data modify storage ${namespace}:params __new_target set value "${namespace}:${callee.value}"`)
+        func.output.push(`data modify storage ${namespace}:params __return set value "${namespace}:temp"`)
+        
         func.output.push(`function ${namespace}:call with storage ${namespace}:${tempVariable}`)
 
         return {
@@ -720,6 +761,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             } else if (result.type === "variable") {
                 func.output.push(`data modify storage ${namespace}:${tempVariable} value set from storage ${namespace}:${result.value} value`)
                 func.output.push(`data modify storage ${namespace}:${tempVariable} type set from storage ${namespace}:${result.value} type`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} function set value ""`)
                 func.output.push(`data modify storage ${namespace}:${tempVariable} function set from storage ${namespace}:${result.value} function`)
             }
             func.output.push(`function ${namespace}:setmember with storage ${namespace}:${tempVariable}`)
@@ -1075,43 +1117,35 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             }
         }
         const object = handleExpression(expression.object, func);
+        if (object.type === "null") return {type: "null"}
+        let variableName = null;
+        if (object.type === "literal") {
+            variableName = "temp-" + Math.random();
+            func.output.push(`data modify storage ${namespace}:${variableName} type set value "${typeof object.raw}"`)
+            func.output.push(`data modify storage ${namespace}:${variableName} value set value ${object.parsed}`)
+        } else {
+            variableName = object.value
+        }
+        const tempVariable = "temp-" + Math.random();
+        const resultVariable = "temp-" + Math.random();
         if (property.type === "variable" && expression.computed) {
-            if (object.type === "literal") {
-
-            } else if (object.type === "variable") {
-                const tempVariable = "temp-" + Math.random();
-                const resultVariable = "temp-" + Math.random();
-                func.output.push(`data modify storage ${namespace}:${tempVariable} property set from storage ${namespace}:${property.value} value`)
-                func.output.push(`data modify storage ${namespace}:${tempVariable} object set value "${namespace}:${object.value}"`)
-                func.output.push(`data modify storage ${namespace}:${tempVariable} result set value "${namespace}:${resultVariable}"`)
-                func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
-                func.output.push(`function ${namespace}:getmember with storage ${namespace}:${tempVariable}`)
-                return {
-                    type: "variable",
-                    value: resultVariable,
-                    object
-                }
-            }
+            func.output.push(`data modify storage ${namespace}:${tempVariable} property set from storage ${namespace}:${property.value} value`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} object set value "${namespace}:${variableName}"`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} result set value "${namespace}:${resultVariable}"`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
+            func.output.push(`function ${namespace}:getmember with storage ${namespace}:${tempVariable}`)
         } else if (property.type === "literal" || !expression.computed) {
             const propertyValue = property.type === "literal" ? property.raw : (property.type === "variable" ? property.value : "");
-            if (object.type === "literal") {
-
-            } else if (object.type === "variable") {
-                const tempVariable = "temp-" + Math.random();
-                const resultVariable = "temp-" + Math.random();
-                
-                func.output.push(`data modify storage ${namespace}:${tempVariable} property set value "${propertyValue}"`)
-                func.output.push(`data modify storage ${namespace}:${tempVariable} object set value "${namespace}:${object.value}"`)
-                func.output.push(`data modify storage ${namespace}:${tempVariable} result set value "${namespace}:${resultVariable}"`)
-                func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
-                func.output.push(`function ${namespace}:getmember with storage ${namespace}:${tempVariable}`)
-
-                return {
-                    type: "variable",
-                    value: resultVariable,
-                    object
-                }
-            }
+            func.output.push(`data modify storage ${namespace}:${tempVariable} property set value "${propertyValue}"`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} object set value "${namespace}:${variableName}"`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} result set value "${namespace}:${resultVariable}"`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
+            func.output.push(`function ${namespace}:getmember with storage ${namespace}:${tempVariable}`)
+        }
+        return {
+            type: "variable",
+            value: resultVariable,
+            object
         }
     }
     if (expression.type === "UpdateExpression") {
@@ -1167,7 +1201,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         const tempVariable = "temp-" + Math.random();
         const objVariable = "obj-" + Math.random();
         func.output.push(`data modify storage ${namespace}:${tempVariable} value set value "${namespace}:${objVariable}"`)
-        func.output.push(`data modify storage ${namespace}:${tempVariable} type set value array`)
+        func.output.push(`data modify storage ${namespace}:${tempVariable} type set value "object"`)
         func.output.push(`data modify storage ${namespace}:${objVariable} array set value []`)
         func.output.push(`data modify storage ${namespace}:${objVariable} type set value "array"`)
         for (const node of expression.elements) {
@@ -1247,6 +1281,25 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         return {
             type: "variable",
             value: awaitResult
+        }
+    }
+    if (expression.type === "ClassExpression") {
+        return generateClass(expression, func)
+    }
+    if (expression.type === "MetaProperty") {
+        if (expression.meta.name === "new") {
+            if (expression.property.name === "target") {
+                const tempVariable = "temp-" + Math.random();
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value set value "undefined"`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set value "undefined"`)
+                func.output.push(`$data modify storage ${namespace}:${tempVariable} value set from storage $(__new_target) value`)
+                func.output.push(`$data modify storage ${namespace}:${tempVariable} type set from storage $(__new_target) type`)
+                func.output.push(`$data modify storage ${namespace}:${tempVariable} function set from storage $(__new_target) function`)
+                return {
+                    type: "variable",
+                    value: tempVariable
+                }
+            }
         }
     }
     return {
