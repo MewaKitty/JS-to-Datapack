@@ -1,0 +1,1 @@
+$data modify storage $(object) prototype set from storage $(class) string.prototype.value
