@@ -5,24 +5,21 @@ import path from "node:path";
 
 const code = `
 function test () {
-    console.debug("test".repeat(4))
-    const arr = ["a", "b", "c", "d"]
-    __run("say setting the cat")
-    arr[1] = "cat";
-    console.log(arr[1])
+    class Example {
+        constructor () {
+            console.log("constructor called");
+        }
+        toString () {
+            return "to string"
+        }
+        valueOf () {
+            return "value of"
+        }
+    };
+    const example = new Example();
+    console.log(example + "")
 }/*
 function main () {
-    class Promise {
-        constructor (func) {
-            __run("data modify storage " + __resolveObject(this) + " promise set value {listeners:[]}")
-            func((data) => {
-                __resolvePromise(this, data);
-            })
-        }
-        then (listener) {
-            __run("data modify storage " + __resolveObject(this) + " promise.listeners append from storage " + __resolveVariable(listener) + " function")
-        }
-    }
     let resolver = null;
     const promise = new Promise(res => {
         resolver = res
