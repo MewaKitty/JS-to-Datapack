@@ -7,9 +7,9 @@ const code = `
 function test () {
     console.debug("test".repeat(4))
     const arr = ["a", "b", "c", "d"]
-    for (const element of arr) {
-        console.log(element)
-    }
+    __run("say setting the cat")
+    arr[1] = "cat";
+    console.log(arr[1])
 }/*
 function main () {
     class Promise {
@@ -755,9 +755,11 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         if (assignmentExpression.left.type === "MemberExpression") {
             func.output.push(`data modify storage ${namespace}:${tempVariable} storage set from storage ${namespace}:${objectName} value`)
             func.output.push(`data modify storage ${namespace}:${tempVariable} property set value "${propertyName}"`)
+            func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
             if (result.type === "literal") {
                 func.output.push(`data modify storage ${namespace}:${tempVariable} value set value ${result.parsed}`)
                 func.output.push(`data modify storage ${namespace}:${tempVariable} type set value "${typeof result.raw}"`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} function set value ""`)
             } else if (result.type === "variable") {
                 func.output.push(`data modify storage ${namespace}:${tempVariable} value set from storage ${namespace}:${result.value} value`)
                 func.output.push(`data modify storage ${namespace}:${tempVariable} type set from storage ${namespace}:${result.value} type`)

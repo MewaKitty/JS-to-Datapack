@@ -1,4 +1,5 @@
-$execute if data storage $(object) {type:"array"} run function $(namespace):getmemberarray {object:"$(object)",result:"$(result)",property:"$(property)"}
+$execute if data storage $(object) {type:"array"} store success storage $(namespace):temp success int 1 run function $(namespace):checkifnumber {value:"$(property)"}
+$execute if data storage $(object) {type:"array"} if data storage $(namespace):temp {success:1} run return run function $(namespace):getmemberarray {object:"$(object)",result:"$(result)",property:"$(property)"}
 $execute if data storage $(object) {type:"object"} run data modify storage $(result) value set from storage $(object) string.$(property).value
 $execute if data storage $(object) {type:"object"} run data modify storage $(result) type set from storage $(object) string.$(property).type
 $execute if data storage $(object) {type:"object"} run data modify storage $(result) function set from storage $(object) string.$(property).function
