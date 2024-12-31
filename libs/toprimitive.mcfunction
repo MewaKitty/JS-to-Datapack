@@ -1,0 +1,1 @@
+$function $(namespace):ordinarytoprimitive {namespace:"$(namespace)",object:"$(object)"}
