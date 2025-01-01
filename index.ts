@@ -3,7 +3,16 @@ import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Ex
 import { readFile, writeFile, cp, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
-const code = `/*
+const code = `
+function main () {
+    const left = false;
+    const right = 1;
+    console.log(!left)
+    console.log(!!right)
+    console.log(!!!right)
+}
+    
+/*
 function fibonacci () {
     let a = 0;
     let b = 1;
@@ -16,7 +25,8 @@ function fibonacci () {
         count++;
     } while (a > 0)
 }*/
-function main () {
+/*
+function promisetest () {
     let resolver = null;
     const promise = new Promise(res => {
         resolver = res
@@ -41,7 +51,7 @@ function main () {
         console.log("then")
     })
     resolver("test")
-}
+}*/
 `
 
 const namespace = "test";
@@ -1063,7 +1073,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             if (argument.type === "literal") return {
                 type: "literal",
                 raw: typeof argument.raw,
-                parsed: "\"" + argument.raw + "\""
+                parsed: "\"" + typeof argument.raw + "\""
             }
             if (argument.type === "variable") {
                 const tempVariable = "temp-" + Math.random();
@@ -1072,6 +1082,34 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                 return {
                     type: "variable",
                     value: tempVariable
+                }
+            }
+        }
+        if (expression.operator === "!") {
+            if (argument.type === "literal") return {
+                type: "literal",
+                raw: !argument.raw,
+                parsed: !argument.raw + ""
+            }
+            if (argument.type === "variable") {
+                const resultVariable = "temp-" + Math.random();
+
+                func.output.push(`data modify storage ${namespace}:${resultVariable} type set value "boolean"`)
+                func.output.push(`execute if data storage ${namespace}:${argument.value} {value:true} run data modify storage ${namespace}:${resultVariable} value set value false`)
+                func.output.push(`execute if data storage ${namespace}:${argument.value} {type:"number"} unless data storage ${namespace}:${resultVariable} {value:0} run data modify storage ${namespace}:${resultVariable} value set value false`)
+                func.output.push(`execute if data storage ${namespace}:${argument.value} {type:"string"} unless data storage ${namespace}:${resultVariable} {value:""} run data modify storage ${namespace}:${resultVariable} value set value false`)
+                func.output.push(`execute if data storage ${namespace}:${argument.value} {type:"object"} run data modify storage ${namespace}:${resultVariable} value set value false`)
+                func.output.push(`execute if data storage ${namespace}:${argument.value} {type:"function"} run data modify storage ${namespace}:${resultVariable} value set value false`)
+
+                func.output.push(`execute if data storage ${namespace}:${argument.value} {value:false} run data modify storage ${namespace}:${resultVariable} value set value true`)
+                func.output.push(`execute if data storage ${namespace}:${argument.value} {value:0} run data modify storage ${namespace}:${resultVariable} value set value true`)
+                func.output.push(`execute if data storage ${namespace}:${argument.value} {value:""} run data modify storage ${namespace}:${resultVariable} value set value true`)
+                func.output.push(`execute if data storage ${namespace}:${argument.value} {type:"object",value:"null"} run data modify storage ${namespace}:${resultVariable} value set value true`)
+                func.output.push(`execute if data storage ${namespace}:${argument.value} {type:"undefined"} run data modify storage ${namespace}:${resultVariable} value set value true`)
+
+                return {
+                    type: "variable",
+                    value: resultVariable
                 }
             }
         }
@@ -1315,6 +1353,80 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                     type: "variable",
                     value: tempVariable
                 }
+            }
+        }
+    }
+    if (expression.type === "LogicalExpression") {
+        const left = handleExpression(expression.left as Expression, func);
+        const right = handleExpression(expression.right, func);
+        if (left.type === "literal" && right.type === "literal") {
+            if (expression.operator === "&&") {
+                return {
+                    type: "literal",
+                    raw: left.raw && right.raw,
+                    parsed: (left.raw && right.raw) + ""
+                }
+            }
+            if (expression.operator === "||") {
+                return {
+                    type: "literal",
+                    raw: left.raw || right.raw,
+                    parsed: (left.raw || right.raw) + ""
+                }
+            }
+        }
+        if (left.type === "variable" || right.type === "variable") {
+            let leftVariable = null;
+            if (left.type === "literal") {
+                const tempVariable = "temp-" + Math.random();
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value set value ${left.parsed}`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set value ${typeof left.raw}`)
+                leftVariable = tempVariable
+            } else if (left.type === "variable") {
+                const tempVariable = "temp-" + Math.random();
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value set from storage ${namespace}:${left.value} value`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set from storage ${namespace}:${left.value} type`)
+                leftVariable = tempVariable;
+            }
+            let rightVariable = null;
+            if (right.type === "literal") {
+                const tempVariable = "temp-" + Math.random();
+                func.output.push(`data modify storage ${namespace}:${tempVariable} value set value ${right.parsed}`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set value ${typeof right.raw}`)
+                rightVariable = tempVariable
+            } else if (right.type === "variable") {
+                rightVariable = right.value;
+            }
+            const resultVariable = "temp-" + Math.random();
+            if (expression.operator === "&&" || expression.operator === "||") {
+                const trueVariable = expression.operator === "&&" ? rightVariable : leftVariable
+                const falseVariable = expression.operator === "&&" ? leftVariable : rightVariable
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {value:true} run data modify storage ${namespace}:${resultVariable} type set from storage ${namespace}:${trueVariable} type`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {value:true} run data modify storage ${namespace}:${resultVariable} value set from storage ${namespace}:${trueVariable} value`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"number"} unless data storage ${namespace}:${resultVariable} {value:0} run data modify storage ${namespace}:${resultVariable} type set from storage ${namespace}:${trueVariable} type`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"number"} unless data storage ${namespace}:${resultVariable} {value:0} run data modify storage ${namespace}:${resultVariable} value set from storage ${namespace}:${trueVariable} value`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"string"} unless data storage ${namespace}:${resultVariable} {value:""} run data modify storage ${namespace}:${resultVariable} type set from storage ${namespace}:${trueVariable} type`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"string"} unless data storage ${namespace}:${resultVariable} {value:""} run data modify storage ${namespace}:${resultVariable} value set from storage ${namespace}:${trueVariable} value`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"object"} run data modify storage ${namespace}:${resultVariable} type set from storage ${namespace}:${trueVariable} type`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"object"} run data modify storage ${namespace}:${resultVariable} value set from storage ${namespace}:${trueVariable} value`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"function"} run data modify storage ${namespace}:${resultVariable} type set from storage ${namespace}:${trueVariable} type`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"function"} run data modify storage ${namespace}:${resultVariable} value set from storage ${namespace}:${trueVariable} value`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"function"} run data modify storage ${namespace}:${resultVariable} function set from storage ${namespace}:${trueVariable} function`)
+                
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {value:false} run data modify storage ${namespace}:${resultVariable} type set from storage ${namespace}:${falseVariable} type`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {value:false} run data modify storage ${namespace}:${resultVariable} value set from storage ${namespace}:${falseVariable} value`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {value:0} run data modify storage ${namespace}:${resultVariable} type set from storage ${namespace}:${falseVariable} type`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {value:0} run data modify storage ${namespace}:${resultVariable} value set from storage ${namespace}:${falseVariable} value`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {value:""} run data modify storage ${namespace}:${resultVariable} type set from storage ${namespace}:${falseVariable} type`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {value:""} run data modify storage ${namespace}:${resultVariable} value set from storage ${namespace}:${falseVariable} value`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"object",value:"null"} run data modify storage ${namespace}:${resultVariable} type set from storage ${namespace}:${falseVariable} type`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"object",value:"null"} run data modify storage ${namespace}:${resultVariable} value set from storage ${namespace}:${falseVariable} value`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"undefined"} run data modify storage ${namespace}:${resultVariable} type set from storage ${namespace}:${falseVariable} type`)
+                func.output.push(`execute if data storage ${namespace}:${leftVariable} {type:"undefined"} run data modify storage ${namespace}:${resultVariable} value set from storage ${namespace}:${falseVariable} value`)
+            }
+            return {
+                type: "variable",
+                value: resultVariable
             }
         }
     }
