@@ -5,19 +5,10 @@ import path from "node:path";
 
 const code = `
 function test () {
-    class Example {
-        constructor () {
-            console.log("constructor called");
-        }
-        toString () {
-            return "to string"
-        }
-        valueOf () {
-            return "value of"
-        }
-    };
-    const example = new Example();
-    console.log(example + "")
+    console.log("the promise is:")
+    const promise = new Promise()
+    console.log(__resolveObject(promise))
+    console.log(promise)
 }/*
 function main () {
     let resolver = null;
@@ -222,6 +213,11 @@ const generateClass = (node: acorn.ClassExpression | acorn.ClassDeclaration, fun
         func.output.push(`data modify storage ${namespace}:${prototypeSetVariable} object set value "${namespace}:${prototypeVariable}"`)
         func.output.push(`data modify storage ${namespace}:${prototypeSetVariable} class set from storage ${namespace}:${superClass.value} value`)
         func.output.push(`function ${namespace}:setclassprototype with storage ${namespace}:${prototypeSetVariable}`)
+    } else {
+        const prototypeSetVariable = "temp-" + Math.random();
+        func.output.push(`data modify storage ${namespace}:${prototypeSetVariable} class set from storage ${namespace}:global string.Object.value`)
+        func.output.push(`data modify storage ${namespace}:${prototypeSetVariable} object set value "${namespace}:${prototypeVariable}"`)
+        func.output.push(`function ${namespace}:setclassprototype with storage ${namespace}:${prototypeSetVariable}`)
     }
     const methods = node.body.body.filter(node => "kind" in node ? node.kind === "method" : false) as MethodDefinition[];
     for (const method of methods) {
@@ -250,6 +246,9 @@ const handleNode = (node: Node, func: MCFunction): string => {
         }
         subfunc.output.push("data modify storage test:global type set value object")
         subfunc.output.push(`data modify storage test:global string set value {globalThis:{type:"object", value:"${namespace}:global"}}`)
+        const standardFunc = new MCFunction(subfunc)
+        subfunc.output.push(...standardFunc.output)
+        standardFunc.output = subfunc.output
         for (const standardNode of standard) {
             console.log(standardNode)
             handleNode(standardNode, subfunc);
@@ -1070,6 +1069,11 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         const objVariable = "obj-" + Math.random();
         func.output.push(`data modify storage ${namespace}:${tempVariable} value set value "${namespace}:${objVariable}"`)
         func.output.push(`data modify storage ${namespace}:${objVariable} type set value "object"`)
+        
+        func.output.push(`data modify storage ${namespace}:temp class set from storage ${namespace}:global string.Object.value`)
+        func.output.push(`data modify storage ${namespace}:temp object set value "${namespace}:${objVariable}"`)
+        func.output.push(`function ${namespace}:setclassprototype with storage ${namespace}:temp`)
+
         for (const property of expression.properties) {
             if (property.type === "SpreadElement") continue;
             if (property.computed) {
@@ -1192,7 +1196,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                 scopeList: func.scopeList,
                 superClass: func.superClass,
                 that: func.that,
-                isAsync: true
+                isAsync: expression.async
             })[0]
         }
     }
