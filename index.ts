@@ -5,10 +5,10 @@ import path from "node:path";
 
 const code = `
 function test () {
-    console.log("the promise is:")
-    const promise = new Promise()
-    console.log(__resolveObject(promise))
-    console.log(promise)
+    const string = "test";
+    for (const character of string) {
+        console.log(character)
+    }
 }/*
 function main () {
     let resolver = null;
@@ -433,10 +433,13 @@ const handleNode = (node: Node, func: MCFunction): string => {
         const tempVariable = "temp-" + Math.random();
         const functionName = "block" + Math.random()
         func.output.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
-        func.output.push(`data modify storage ${namespace}:${tempVariable} storage set from storage ${namespace}:${right.value} value`)
+        func.output.push(`execute if data storage ${namespace}:${right.value} {type:"object"} run data modify storage ${namespace}:${tempVariable} storage set from storage ${namespace}:${right.value} value`)
+        func.output.push(`execute if data storage ${namespace}:${right.value} {type:"string"} run data modify storage ${namespace}:${tempVariable} storage set value "${namespace}:${right.value}"`)
         func.output.push(`data modify storage ${namespace}:${tempVariable} index set value 0`)
+        func.output.push(`execute if data storage ${namespace}:${right.value} {type:"string"} run data modify storage ${namespace}:${tempVariable} next set value 1`)
         func.output.push(`data modify storage ${namespace}:${tempVariable} function set value "${namespace}:${functionName}"`)
-        func.output.push(`function ${namespace}:looparray with storage ${namespace}:${tempVariable}`)
+        func.output.push(`execute if data storage ${namespace}:${right.value} {type:"object"} run function ${namespace}:looparray with storage ${namespace}:${tempVariable}`)
+        func.output.push(`execute if data storage ${namespace}:${right.value} {type:"string"} run function ${namespace}:loopstring with storage ${namespace}:${tempVariable}`)
         const subfunc = new MCFunction(func)
         subfunc.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${variableName}.value set from storage ${namespace}:temp data.value`)
         subfunc.output.push(`data modify storage ${namespace}:${func.blockScope} variables.${variableName}.type set from storage ${namespace}:temp data.type`)
