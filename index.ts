@@ -5,16 +5,16 @@ import path from "node:path";
 
 const code = `
 function test () {
-    let a = 1;
+    let a = 0;
     let b = 1;
     let count = 1;
-    while (a > 0) {
+    do {
         console.log(count + ": " + a)
         const old_b = b;
         b = a + b;
         a = old_b;
         count++;
-    }
+    } while (a > 0)
 }/*
 function main () {
     let resolver = null;
@@ -257,7 +257,7 @@ const handleNode = (node: Node, func: MCFunction): string => {
         standardFunc.output = subfunc.output
         for (const standardNode of standard) {
             console.log(standardNode)
-            handleNode(standardNode, subfunc);
+            handleNode(standardNode, standardFunc);
         }
         handleNode((node as FunctionDeclaration).body, subfunc)
         writeFile("./output/" + (node as FunctionDeclaration).id.name + ".mcfunction", subfunc.output.join("\n"))
@@ -325,12 +325,12 @@ const handleNode = (node: Node, func: MCFunction): string => {
             if (ifStatement.alternate) handleNode(ifStatement.alternate, func)
         }
     }
-    if (node.type === "WhileStatement") {
-        const whileStatement = node as WhileStatement;
+    if (node.type === "WhileStatement" || node.type === "DoWhileStatement") {
+        const whileStatement = node as WhileStatement | acorn.DoWhileStatement;
         const test = handleExpression(whileStatement.test, func)
-        if (test.type === "literal" && !test.raw) return "";
+        if (node.type === "WhileStatement" && test.type === "literal" && !test.raw) return "";
         const functionName = "block" + Math.random()
-        if (test.type === "variable") {
+        if (node.type === "WhileStatement" && test.type === "variable") {
             generateIfLines(func, test, functionName)
         } else {
             func.output.push(`function ${namespace}:${functionName}`)
@@ -341,7 +341,7 @@ const handleNode = (node: Node, func: MCFunction): string => {
             const subtest = handleExpression(whileStatement.test, subfunc)
             if (subtest.type !== "variable") return "";
             generateIfLines(subfunc, subtest, functionName)
-        } else {     
+        } else if (test.type === "literal" && !test.raw) {     
             subfunc.output.push(`function ${namespace}:${functionName}`)
         }
         writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
@@ -779,7 +779,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             func.output.push(`data modify storage ${namespace}:${tempVariable} blockScope set value "${func.blockScope}"`)
             func.output.push(`data modify storage ${namespace}:${tempVariable} name set value "${variableName}"`)
             if (result.type === "literal") {
-                func.output.push(`data modify storage ${namespace}:${tempVariable} type set value "${result.type}"`)
+                func.output.push(`data modify storage ${namespace}:${tempVariable} type set value "${typeof result.raw}"`)
                 func.output.push(`data modify storage ${namespace}:${tempVariable} value set value ${result.parsed}`)
                 func.output.push(`function ${namespace}:setvariableliteral with storage ${namespace}:${tempVariable}`)
             } else if (result.type === "variable") {

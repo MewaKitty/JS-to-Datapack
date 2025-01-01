@@ -6,7 +6,7 @@ globalThis.Object = class {
         return "[object Object]";
     }
 }
-globalThis.convertToString = text => {
+const convertToString = text => {
     if (typeof text === "string") {
         return text
     };

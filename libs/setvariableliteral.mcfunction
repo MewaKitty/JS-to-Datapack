@@ -19,4 +19,4 @@ $data modify storage $(namespace):temp name set value "$(name)"
 $data modify storage $(namespace):temp blockScope set from storage $(storage) scopes[$(index)]
 $data modify storage $(namespace):temp type set value "$(type)"
 $data modify storage $(namespace):temp value set value "$(value)"
-$function $(namespace):getvariable with storage $(namespace):temp
+$function $(namespace):setvariableliteral with storage $(namespace):temp
