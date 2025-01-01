@@ -3,8 +3,8 @@ import type { Node, FunctionDeclaration, BlockStatement, ExpressionStatement, Ex
 import { readFile, writeFile, cp, readdir, unlink } from "node:fs/promises";
 import path from "node:path";
 
-const code = `
-function test () {
+const code = `/*
+function fibonacci () {
     let a = 0;
     let b = 1;
     let count = 1;
@@ -15,7 +15,7 @@ function test () {
         a = old_b;
         count++;
     } while (a > 0)
-}/*
+}*/
 function main () {
     let resolver = null;
     const promise = new Promise(res => {
@@ -30,7 +30,7 @@ function main () {
     }
     console.log("foo is " + __resolveVariable(foo))
     const magic = async () => {
-        console.log("magic time")
+        __run("say magic time")
         const innerPromise = foo();
         console.log(__resolveObject(innerPromise))
         console.log(await innerPromise)
@@ -41,7 +41,7 @@ function main () {
         console.log("then")
     })
     resolver("test")
-}*/
+}
 `
 
 const namespace = "test";
@@ -149,6 +149,10 @@ const generateFunction = (params: Identifier[], isExpression: boolean, body: Nod
         const returnObjVariable = "temp-" + Math.random();
         subfunc.output.push(`$data modify storage $(__return) value set value "${namespace}:${returnObjVariable}"`)
         subfunc.output.push(`$data modify storage $(__return) type set value "object"`)
+        subfunc.output.push(`data modify storage ${namespace}:${returnObjVariable} type set value "object"`)
+        func.output.push(`data modify storage ${namespace}:temp class set from storage ${namespace}:global string.Promise.value`)
+        func.output.push(`data modify storage ${namespace}:temp object set value "${namespace}:${returnObjVariable}"`)
+        func.output.push(`function ${namespace}:setclassprototype with storage ${namespace}:temp`)
         subfunc.output.push(`data modify storage ${namespace}:${returnObjVariable} promise set value {listeners:[]}`)
         subfunc.asyncReturn = returnObjVariable;
     }
