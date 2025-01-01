@@ -8,9 +8,10 @@ $execute if data storage $(argument) {type:"object",value:"null"} run data modif
 $execute if data storage $(argument) {type:"object",value:"null"} run return run data modify storage $(result) value set value "null"
 $execute if data storage $(argument) {type:"boolean",value:true} run data modify storage $(result) type set value "true"
 $execute if data storage $(argument) {type:"boolean",value:false} run return run data modify storage $(result) value set value "false"
-$execute if data storage $(argument) {type:"number"} run data modify storage $(namespace):test storage set value "$(result)"
-$execute if data storage $(argument) {type:"number"} run data modify storage $(namespace):test left set from storage $(argument) value
-$execute if data storage $(argument) {type:"number"} run data modify storage $(namespace):test right set value ""
+$execute if data storage $(argument) {type:"number"} run data modify storage $(namespace):temp-numbertostring storage set value "$(result)"
+$execute if data storage $(argument) {type:"number"} run data modify storage $(namespace):temp-numbertostring left set from storage $(argument) value
+$execute if data storage $(argument) {type:"number"} run data modify storage $(namespace):temp-numbertostring right set value ""
+$execute if data storage $(argument) {type:"number"} run return run function $(namespace):concat with storage $(namespace):temp-numbertostring
 $data modify storage $(namespace):temp-hint value set value "STRING"
 $function $(namespace):toprimitive {namespace:"$(namespace)",object:"$(argument)"}
 $function $(namespace):tostring {namespace:"$(namespace)",argument:"$(namespace):temp-result",result:"$(result)"}

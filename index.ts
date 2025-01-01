@@ -5,9 +5,15 @@ import path from "node:path";
 
 const code = `
 function test () {
-    const string = "test";
-    for (const character of string) {
-        console.log(character)
+    let a = 1;
+    let b = 1;
+    let count = 1;
+    while (a > 0) {
+        console.log(count + ": " + a)
+        const old_b = b;
+        b = a + b;
+        a = old_b;
+        count++;
     }
 }/*
 function main () {
