@@ -5,22 +5,27 @@ import path from "node:path";
 
 const code = `
 function main () {
-    let minutes = 0;
-    let seconds = 0;
-    setInterval(() => {
-        seconds++;
-        if (seconds >= 60) {
-            seconds -= 60;
-            minutes += 1;
+    const run = async () => {
+        const wait = time => {
+            return new Promise(res => setTimeout(res, time))
         }
-        let shownSeconds = "";
-        if (seconds >= 10) {
-            shownSeconds = seconds + "";
-        } else {
-            shownSeconds = "0" + seconds
+        __run("data modify storage " + __namespace + ":playerx type set value number")
+        __run("execute store result storage " + __namespace + ":playerx value int 1 run data get entity @s Pos[0] 1")
+        const x = __toVariable("playerx")
+        __run("data modify storage " + __namespace + ":playerz type set value number")
+        __run("execute store result storage " + __namespace + ":playerz value int 1 run data get entity @s Pos[2] 1")
+        const z = __toVariable("playerz")
+        console.debug(x)
+        console.debug(z)
+        console.debug("ran")
+        for (let i = -64; i <= 320; i++) {
+            __run("setblock " + x + " " + i + " " + z + " minecraft:stone")
+            if (i % 50 === 0) await wait(50)
+            console.log(i)
         }
-        console.log(minutes + ":" + shownSeconds + " elapsed")
-    }, 1000)
+        console.debug("pillar finished")
+    }
+    run();
 }
     
 /*
@@ -83,6 +88,7 @@ type MCFunctionMetadata = {
     output?: string[],
     skipScope?: boolean,
     isAsync?: boolean
+    asyncReturn?: string
 }
 
 class MCFunction {
@@ -104,6 +110,7 @@ class MCFunction {
         if (metadata) this.superClass = metadata.superClass
         if (metadata) this.type = metadata.type
         if (metadata) this.that = metadata.that
+        this.asyncReturn = metadata.asyncReturn
         if (!metadata.skipScope) {
             this.blockScope = "scope-" + Math.random();
             this.scopeList = [...metadata.scopeList, this.blockScope]
@@ -281,7 +288,6 @@ const handleNode = (node: Node, func: MCFunction): string => {
         subfunc.output.push(...standardFunc.output)
         standardFunc.output = subfunc.output
         for (const standardNode of standard) {
-            console.log(standardNode)
             handleNode(standardNode, standardFunc);
         }
         handleNode((node as FunctionDeclaration).body, subfunc)
@@ -331,10 +337,11 @@ const handleNode = (node: Node, func: MCFunction): string => {
             const prefix = (func.type === "arrow" || func.type === "class") ? "$" : ""
             generateIfLines(func, test, functionName)
             const subfunc = new MCFunction(func)
+            subfunc.destination = "./output/" + functionName + ".mcfunction"
             handleNode(ifStatement.consequent, subfunc)
-            writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
-            if (ifStatement.alternate) {
-                const functionAlternate = "block" + Math.random()
+            const awaitFunction = "await-block-" + Math.random();
+            if (ifStatement.alternate || func.asyncReturn) {
+                const functionAlternate = "block-alternate" + Math.random()
                 func.output.push(`data modify storage ${namespace}:temp-result result set value 0`)
                 func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:false} run function ${namespace}:${functionAlternate}${additional}`)
                 func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {value:0} run function ${namespace}:${functionAlternate}${additional}`)
@@ -343,9 +350,21 @@ const handleNode = (node: Node, func: MCFunction): string => {
                 func.output.push(`${prefix}execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${test.value} {type:"undefined"} run function ${namespace}:${functionAlternate}${additional}`)
                 func.output.push(`execute if data storage ${namespace}:temp-result {result:-2000000000} run return -2000000000`)
                 const alternatefunc = new MCFunction(func)
-                handleNode(ifStatement.alternate, alternatefunc)
-                writeFile("./output/" + functionAlternate + ".mcfunction", alternatefunc.output.join("\n"))
+                alternatefunc.destination = "./output/" + functionAlternate + ".mcfunction";
+                if (ifStatement.alternate) {
+                    handleNode(ifStatement.alternate, alternatefunc)
+                }
+                if (func.asyncReturn) alternatefunc.output.push(`function ${namespace}:${awaitFunction}${additional}`);
+                alternatefunc.write();
             }
+            if (func.asyncReturn) {
+                func.write();
+                func.output = [];
+                func.destination = "./output/" + awaitFunction + ".mcfunction"
+
+                subfunc.output.push(`function ${namespace}:${awaitFunction}${additional}`)
+            }
+            subfunc.write()
         } else if (test.type === "null") {
             if (ifStatement.alternate) handleNode(ifStatement.alternate, func)
         }
@@ -383,7 +402,7 @@ const handleNode = (node: Node, func: MCFunction): string => {
             type: func.type
         })
         if (forStatement.init) handleNode(forStatement.init, initfunc);
-        const functionName = "block" + Math.random()
+        const functionName = "block-for" + Math.random()
         let test = null;
         if (forStatement.test) {
             test = handleExpression(forStatement.test, initfunc)
@@ -396,15 +415,39 @@ const handleNode = (node: Node, func: MCFunction): string => {
         } else {
             func.output.push(`function ${namespace}:${functionName}`)
         }
+        subfunc.destination = "./output/" + functionName + ".mcfunction"
+        const additional = (func.type === "arrow" || func.type === "class") ? ` {__this:"$(__this)",__this_obj:"$(__this_obj)",__new_target:"$(__new_target)",__return:"$(__return)"}` : ""
+        const awaitFunction = "block-await" + Math.random();
         handleNode(forStatement.body, subfunc)
         if (forStatement.update) handleExpression(forStatement.update, subfunc)
         if (forStatement.test && test && test.type === "variable") {
             const subtest = handleExpression(forStatement.test, subfunc)
-            if (subtest.type === "variable") generateIfLines(subfunc, subtest, functionName)
+            if (subtest.type === "variable") {
+                if (func.asyncReturn) {
+                    const functionAlternate = "block-for-alternate" + Math.random()
+                    subfunc.output.push(`data modify storage ${namespace}:temp-result result set value 0`)
+                    subfunc.output.push(`$execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${subtest.value} {value:false} run function ${namespace}:${functionAlternate}${additional}`)
+                    subfunc.output.push(`$execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${subtest.value} {value:0} run function ${namespace}:${functionAlternate}${additional}`)
+                    subfunc.output.push(`$execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${subtest.value} {value:""} run function ${namespace}:${functionAlternate}${additional}`)
+                    subfunc.output.push(`$execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${subtest.value} {type:"object",value:"null"} run function ${namespace}:${functionAlternate}${additional}`)
+                    subfunc.output.push(`$execute store result storage ${namespace}:temp-result result int 1 if data storage ${namespace}:${subtest.value} {type:"undefined"} run function ${namespace}:${functionAlternate}${additional}`)
+                    subfunc.output.push(`execute if data storage ${namespace}:temp-result {result:-2000000000} run return -2000000000`)
+                    const alternatefunc = new MCFunction(func)
+                    alternatefunc.destination = "./output/" + functionAlternate + ".mcfunction";
+                    alternatefunc.output.push(`function ${namespace}:${awaitFunction}${additional}`);
+                    alternatefunc.write();
+                }
+                generateIfLines(subfunc, subtest, functionName)
+            }
         } else {
             subfunc.output.push(`function ${namespace}:${functionName}`)
         }
-        writeFile("./output/" + functionName + ".mcfunction", subfunc.output.join("\n"))
+        subfunc.write();
+        if (func.asyncReturn) {
+            func.write();
+            func.output = [];
+            func.destination = "./output/" + awaitFunction + ".mcfunction"
+        }
     }
     if (node.type === "SwitchStatement") {
         const switchStatement = node as SwitchStatement;
@@ -544,10 +587,10 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
     }
     if (expression.type === "CallExpression") {
         if (((expression as CallExpression)?.callee as Identifier)?.name === "__run") {
-            if (expression.arguments[0].type === "Literal" && typeof expression.arguments[0].value === "string") {
-                func.output.push(expression.arguments[0].value)
+            const subexpression = handleExpression(expression.arguments[0] as Expression, func);
+            if (subexpression.type === "literal" && typeof subexpression.raw === "string") {
+                func.output.push(subexpression.raw)
             } else {
-                const subexpression = handleExpression(expression.arguments[0] as Expression, func);
                 if (subexpression.type !== "variable") return {
                     type: "null"
                 }
@@ -565,6 +608,15 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
                 type: "literal",
                 raw: namespace + ":" + subexpression.value,
                 parsed: `"${namespace}:${subexpression.value}"`
+            }
+        } else if (((expression as CallExpression)?.callee as Identifier)?.name === "__toVariable") {
+            const subexpression = handleExpression(expression.arguments[0] as Expression, func);
+            if (subexpression.type !== "literal" || typeof subexpression.raw !== "string") return {
+                type: "null"
+            }
+            return {
+                type: "variable",
+                value: subexpression.raw
             }
         } else if (((expression as CallExpression)?.callee as Identifier)?.name === "__resolveObject") {
             const subexpression = handleExpression(expression.arguments[0] as Expression, func);
@@ -595,7 +647,6 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             func.output.push(`function ${namespace}:resolvepromise with storage ${namespace}:${tempVariable}`)
             return subexpression
         } else if (((expression as CallExpression)?.callee as Identifier)?.name === "__singleQuoteConcat") {
-            console.log(func.destination)
             const tempVariable = "temp-" + Math.random();
             const leftExpression = handleExpression(expression.arguments[0] as Expression, func);
             if (leftExpression.type === "literal") {
