@@ -46,3 +46,12 @@ globalThis.Promise = class {
         __run("data modify storage " + __resolveObject(this) + " promise.listeners append from storage " + __resolveVariable(listener) + " function")
     }
 }
+globalThis.setTimeout = (handler, timeout) => {
+    __run("schedule function " + __callableFunction(handler) + " " + (timeout / 50) + "t append")
+}
+globalThis.setInterval = (handler, timeout) => {
+    __run("schedule function " + __callableFunction(() => {
+        handler();
+        setInterval(handler, timeout);
+    }) + " " + (timeout / 50) + "t append")
+}

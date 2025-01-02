@@ -5,11 +5,22 @@ import path from "node:path";
 
 const code = `
 function main () {
-    const left = false;
-    const right = 1;
-    console.log(!left)
-    console.log(!!right)
-    console.log(!!!right)
+    let minutes = 0;
+    let seconds = 0;
+    setInterval(() => {
+        seconds++;
+        if (seconds >= 60) {
+            seconds -= 60;
+            minutes += 1;
+        }
+        let shownSeconds = "";
+        if (seconds >= 10) {
+            shownSeconds = seconds + "";
+        } else {
+            shownSeconds = "0" + seconds
+        }
+        console.log(minutes + ":" + shownSeconds + " elapsed")
+    }, 1000)
 }
     
 /*
@@ -604,6 +615,31 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             return {
                 type: "variable",
                 value: resultVariable
+            }
+        } else if (((expression as CallExpression)?.callee as Identifier)?.name === "__callableFunction") {
+            const subexpression = handleExpression(expression.arguments[0] as Expression, func);
+            if (subexpression.type !== "variable") return {
+                type: "null"
+            }
+            const tempVariable = "temp-" + Math.random();
+            const contents: string[] = []
+            
+            contents.push(`data modify storage ${namespace}:${tempVariable} function set from storage ${namespace}:${subexpression.value} function`)
+            
+            contents.push(`data modify storage ${namespace}:${tempVariable} namespace set value "${namespace}"`)
+            contents.push(`data modify storage ${namespace}:${tempVariable} storage set value "${namespace}:params"`)
+
+            contents.push(`data modify storage ${namespace}:params __this set value "undefined"`)
+            contents.push(`data modify storage ${namespace}:params __this_obj set value "undefined"`)
+            
+            contents.push(`data modify storage ${namespace}:params __new_target set value "${namespace}:undefined"`)
+            contents.push(`data modify storage ${namespace}:params __return set value "${namespace}:${tempVariable}"`)
+            contents.push(`function ${namespace}:call with storage ${namespace}:${tempVariable}`)
+            writeFile("./output/callable-" + tempVariable + ".mcfunction", contents.join("\n"))
+            return {
+                type: "literal",
+                raw: namespace + ":callable-" + tempVariable,
+                parsed: '"' + namespace + ":callable-" + tempVariable + '"'
             }
         } else {
             const callExpression = expression as CallExpression
