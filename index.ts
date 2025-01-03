@@ -9,21 +9,32 @@ function main () {
         const wait = time => {
             return new Promise(res => setTimeout(res, time))
         }
-        __run("data modify storage " + __namespace + ":playerx type set value number")
-        __run("execute store result storage " + __namespace + ":playerx value int 1 run data get entity @s Pos[0] 1")
-        const x = __toVariable("playerx")
-        __run("data modify storage " + __namespace + ":playerz type set value number")
-        __run("execute store result storage " + __namespace + ":playerz value int 1 run data get entity @s Pos[2] 1")
-        const z = __toVariable("playerz")
-        console.debug(x)
-        console.debug(z)
-        console.debug("ran")
-        for (let i = -64; i <= 320; i++) {
-            __run("setblock " + x + " " + i + " " + z + " minecraft:stone")
-            if (i % 50 === 0) await wait(50)
-            console.log(i)
+        console.log("start")
+        const fillGround = async () => {
+            __run("data modify storage " + __namespace + ":playerx type set value number")
+            __run("execute store result storage " + __namespace + ":playerx value int 1 run data get entity @p Pos[0] 1")
+            const x = __toVariable("playerx")
+            __run("data modify storage " + __namespace + ":playerz type set value number")
+            __run("execute store result storage " + __namespace + ":playerz value int 1 run data get entity @p Pos[2] 1")
+            const z = __toVariable("playerz")
+            const parsedX = x - (x % 16)
+            const parsedZ = z - (z % 16)
+            for (let chunkX = -12; chunkX <= 12; chunkX++) {
+                for (let chunkZ = -12; chunkZ <= 12; chunkZ++) {
+                    const lowX = parsedX + (chunkX * 16)
+                    const lowZ = parsedZ + (chunkZ * 16)
+                    __run("fill " + lowX + " " + -64 + " " + lowZ + " " + (lowX + 15) + " " + -61 + " " + (lowZ + 15) + " minecraft:air")
+                    for (let blockX = 0; blockX < 16; blockX += 2) {
+                        for (let blockZ = 0; blockZ < 16; blockZ += 2) {
+                            __run("setblock " + (lowX + blockX) + " " + -64 + " " + (lowZ + blockZ) + " minecraft:grass_block")
+                        }
+                    }
+                    await wait(50);
+                }
+            }
+            fillGround();
         }
-        console.debug("pillar finished")
+        fillGround();
     }
     run();
 }
@@ -846,7 +857,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
             if (assignmentExpression.operator === "+=") {
                 func.output.push(`function ${namespace}:add {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",prefix:""}`)
             } else if (assignmentExpression.operator === "-=") {
-                func.output.push(`function ${namespace}:subtract {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",prefix:""}`)
+                func.output.push(`function ${namespace}:mathoperation {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",operation:"-="}`)
             } else if (assignmentExpression.operator === "*=") {
                 func.output.push(`function ${namespace}:mathoperation {namespace:"${namespace}",left:"${namespace}:${leftVariable}",right:"${namespace}:${rightVariable}",operation:"*="}`)
             } else if (assignmentExpression.operator === "/=") {
@@ -1235,7 +1246,7 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         }
     }
     if (expression.type === "MemberExpression") {
-        const property: ExpressionOutput = expression.property.type === "Identifier" ? {type: "variable", value: expression.property.name} : handleExpression(expression.property as Expression, func)
+        const property: ExpressionOutput = expression.property.type === "Identifier" && !expression.computed ? {type: "variable", value: expression.property.name} : handleExpression(expression.property as Expression, func)
         if (expression.object.type === "Super") {
             console.log("it's super member time!")
             const tempVariable = "temp-" + Math.random();
@@ -1270,6 +1281,8 @@ const handleExpression = (expression: Expression, func: MCFunction): ExpressionO
         const tempVariable = "temp-" + Math.random();
         const resultVariable = "temp-" + Math.random();
         if (property.type === "variable" && expression.computed) {
+            console.log(variableName)
+            console.log(property.value)
             func.output.push(`data modify storage ${namespace}:${tempVariable} property set from storage ${namespace}:${property.value} value`)
             func.output.push(`data modify storage ${namespace}:${tempVariable} object set value "${namespace}:${variableName}"`)
             func.output.push(`data modify storage ${namespace}:${tempVariable} result set value "${namespace}:${resultVariable}"`)
